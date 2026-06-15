@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>佛山木版年画 AI 创作小程序 - 作品展示</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: #25211d;
+      background: #f6f1e8;
+      font-family: "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif;
+      line-height: 1.45;
+    }
+
+    .page {
+      min-height: 273mm;
+      padding: 0;
+      page-break-after: always;
+      background:
+        linear-gradient(90deg, rgba(168, 41, 31, 0.08), transparent 34%),
+        #fffaf1;
+      border: 1px solid #dfd1bc;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .page:last-child {
+      page-break-after: auto;
+    }
+
+    .page::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 9mm;
+      height: 100%;
+      background: linear-gradient(#b72024, #e0a321 38%, #1d5f74 72%, #202020);
+    }
+
+    .content {
+      position: relative;
+      padding: 14mm 14mm 12mm 19mm;
+      z-index: 1;
+    }
+
+    .kicker {
+      color: #a12824;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 5px 0 8px;
+      color: #201914;
+      font-size: 27px;
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 18px 0 8px;
+      color: #8f211d;
+      font-size: 17px;
+      line-height: 1.25;
+      border-bottom: 1px solid #e5d6bf;
+      padding-bottom: 5px;
+    }
+
+    h3 {
+      margin: 12px 0 5px;
+      color: #25211d;
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    p {
+      margin: 0 0 8px;
+      font-size: 11.5px;
+    }
+
+    ul {
+      margin: 6px 0 9px;
+      padding-left: 18px;
+    }
+
+    li {
+      margin: 3px 0;
+      font-size: 11.2px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.65fr 1fr;
+      gap: 14px;
+      align-items: stretch;
+      margin-top: 8px;
+    }
+
+    .summary {
+      padding: 12px 13px;
+      border: 1px solid #ead8ba;
+      background: rgba(255, 255, 255, 0.62);
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .meta-item {
+      padding: 9px 10px;
+      background: #f7ead3;
+      border-left: 4px solid #c73b2f;
+    }
+
+    .meta-label {
+      display: block;
+      color: #755b3e;
+      font-size: 9.5px;
+      margin-bottom: 2px;
+    }
+
+    .meta-value {
+      display: block;
+      color: #201914;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 10px 0 2px;
+    }
+
+    .tag {
+      padding: 4px 7px;
+      border: 1px solid #d7b17b;
+      color: #543f28;
+      background: #fff6e8;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 9px;
+      margin-top: 7px;
+    }
+
+    .card {
+      border: 1px solid #e5d6bf;
+      background: rgba(255, 255, 255, 0.68);
+      padding: 10px;
+    }
+
+    .card strong {
+      color: #8f211d;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 7px;
+      margin: 9px 0 4px;
+    }
+
+    .step {
+      min-height: 58px;
+      padding: 8px 7px;
+      background: #fff;
+      border: 1px solid #e5d6bf;
+      position: relative;
+    }
+
+    .step-num {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      margin-bottom: 5px;
+      color: #fff;
+      background: #b72024;
+      text-align: center;
+      line-height: 18px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .step-title {
+      display: block;
+      color: #201914;
+      font-size: 10.5px;
+      font-weight: 700;
+    }
+
+    .step-desc {
+      display: block;
+      margin-top: 3px;
+      color: #705d4b;
+      font-size: 9.2px;
+      line-height: 1.35;
+    }
+
+    .split-panel {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .color-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 7px;
+    }
+
+    .color-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px;
+      border: 1px solid #e5d6bf;
+      background: #fff;
+      font-size: 10.2px;
+    }
+
+    .swatch {
+      width: 17px;
+      height: 17px;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      flex: 0 0 auto;
+    }
+
+    .swatch.black { background: #1d1a17; }
+    .swatch.red { background: #c72a2a; }
+    .swatch.yellow { background: #e2a51d; }
+    .swatch.deep-yellow { background: #b87a19; }
+    .swatch.blue { background: #1f6e9d; }
+
+    .qr-box {
+      min-height: 94px;
+      border: 1px dashed #bda27d;
+      background: rgba(255, 255, 255, 0.7);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #79634d;
+      padding: 12px;
+    }
+
+    .qr-title {
+      color: #8f211d;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .quote {
+      margin-top: 9px;
+      padding: 10px 12px;
+      border-left: 4px solid #1d5f74;
+      background: #eef6f6;
+      color: #314b51;
+      font-size: 11px;
+    }
+
+    .footer {
+      position: absolute;
+      right: 14mm;
+      bottom: 7mm;
+      color: #8b7a67;
+      font-size: 9px;
+    }
+
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 10px;
+      color: #6b1f1c;
+    }
+  </style>
+</head>
+<body>
+  <section class="page">
+    <div class="content">
+      <div class="kicker">Portfolio for Internship Interview</div>
+      <h1>佛山木版年画 AI 创作微信小程序</h1>
+      <p class="summary">
+        一个面向非遗数字化展示与互动体验的微信小程序项目。项目把 AI 图像生成、后端分色处理、云存储资源管理、五色套印交互和 2D/3D 展示组合在一起，让用户不仅能生成一张年画，还能看到它如何被拆成不同色版并逐层叠印。
+      </p>
+
+      <div class="hero-grid">
+        <div>
+          <h2>项目概览</h2>
+          <div class="meta">
+            <div class="meta-item">
+              <span class="meta-label">项目类型</span>
+              <span class="meta-value">微信小程序 + 云开发 + AI 图像处理</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">展示对象</span>
+              <span class="meta-value">HR 初筛、实习面试、课程/项目汇报</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">我的角色</span>
+              <span class="meta-value">前端交互、云函数、分色逻辑、CI/CD</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">当前状态</span>
+              <span class="meta-value">持续迭代，上线后补充小程序码</span>
+            </div>
+          </div>
+          <div class="tag-row">
+            <span class="tag">微信小程序</span>
+            <span class="tag">CloudBase</span>
+            <span class="tag">AI 生图</span>
+            <span class="tag">图像分色</span>
+            <span class="tag">GitHub Actions</span>
+            <span class="tag">CI/CD</span>
+            <span class="tag">COS 静态资源同步</span>
+          </div>
+        </div>
+        <div class="qr-box">
+          <div class="qr-title">小程序码 / 体验链接</div>
+          <p>小程序上线后在此处替换为二维码或体验链接。</p>
+          <p><code>GitHub: hd18512614931-cyber/model-server</code></p>
+        </div>
+      </div>
+
+      <h2>我重点实现的内容</h2>
+      <div class="cards">
+        <div class="card">
+          <h3>AI 年画创作链路</h3>
+          <p>实现小程序端输入主题、调用云函数生成图片、保存生成结果并进入后续分色展示的完整流程。</p>
+        </div>
+        <div class="card">
+          <h3>后端分色逻辑</h3>
+          <p>将 AI 生成图按主要色版拆成透明 PNG 图层，使“完整图像”可以解释为多块木版逐层套印的结果。</p>
+        </div>
+        <div class="card">
+          <h3>套印交互体验</h3>
+          <p>在首页实现选色板、拖动纸张、翻转压印和逐层显色，让传统年画工艺从静态介绍变成可操作体验。</p>
+        </div>
+        <div class="card">
+          <h3>自动化部署</h3>
+          <p>接入 GitHub Actions，将 <code>public/</code> 下模型、图片、视频和图层资源自动同步到腾讯云 COS。</p>
+        </div>
+      </div>
+
+      <h2>适合面试展开的亮点</h2>
+      <ul>
+        <li><strong>工程完整度：</strong>覆盖小程序前端、云函数、云存储、AI 生成、图像处理和 CI/CD，不只是页面展示。</li>
+        <li><strong>业务理解：</strong>把木版年画“一色一版、逐层套印”的工艺特征转译成可交互的数字体验。</li>
+        <li><strong>问题解决：</strong>处理小程序包体积、云端资源同步、临时文件限制、图层显示顺序和分色串色等实际问题。</li>
+        <li><strong>可持续维护：</strong>通过 GitHub Actions 和环境变量管理，减少手动同步资源和泄露密钥的风险。</li>
+      </ul>
+    </div>
+    <div class="footer">佛山木版年画 AI 创作小程序｜作品展示 1/2</div>
+  </section>
+
+  <section class="page">
+    <div class="content">
+      <div class="kicker">Technical Implementation</div>
+      <h1>技术实现与项目价值</h1>
+
+      <h2>核心流程</h2>
+      <div class="flow">
+        <div class="step">
+          <span class="step-num">1</span>
+          <span class="step-title">输入主题</span>
+          <span class="step-desc">小程序端收集用户创作需求</span>
+        </div>
+        <div class="step">
+          <span class="step-num">2</span>
+          <span class="step-title">AI 生图</span>
+          <span class="step-desc">云函数调用模型生成年画风格图像</span>
+        </div>
+        <div class="step">
+          <span class="step-num">3</span>
+          <span class="step-title">云端保存</span>
+          <span class="step-desc">生成图与分色层进入 CloudBase 存储</span>
+        </div>
+        <div class="step">
+          <span class="step-num">4</span>
+          <span class="step-title">后端分色</span>
+          <span class="step-desc">输出透明 PNG 色彩图层</span>
+        </div>
+        <div class="step">
+          <span class="step-num">5</span>
+          <span class="step-title">前端展示</span>
+          <span class="step-desc">2D 拆解、套印模拟和 3D 展示</span>
+        </div>
+      </div>
+
+      <div class="split-panel">
+        <div>
+          <h2>后端分色逻辑</h2>
+          <p>项目中最能体现技术实现的部分，是把 AI 生成图继续处理成多个可叠加的色版图层。后端读取图片像素数据，按颜色距离和透明度生成独立 PNG 图层，再将图层上传到云存储，供小程序端按顺序加载。</p>
+          <p>这样做的价值是：AI 结果不再只是“一张图”，而是可以被拆解为传统木版年画的工艺结构，便于教学展示、交互体验和面试讲解。</p>
+          <div class="color-list">
+            <div class="color-item"><span class="swatch black"></span>黑色：线稿与轮廓</div>
+            <div class="color-item"><span class="swatch red"></span>红色：主体红底</div>
+            <div class="color-item"><span class="swatch yellow"></span>黄色：装饰亮色</div>
+            <div class="color-item"><span class="swatch deep-yellow"></span>深黄：文字与厚重色</div>
+            <div class="color-item"><span class="swatch blue"></span>蓝色：青蓝色块</div>
+          </div>
+        </div>
+        <div>
+          <h2>CI/CD 与资源部署</h2>
+          <p>仓库中配置了 GitHub Actions：当 <code>public/**</code> 资源推送到 <code>main</code> 分支时，自动安装 <code>coscmd</code>，使用 GitHub Secrets 中的腾讯云密钥，将模型、知识图片视频和分层图同步到 COS。</p>
+          <ul>
+            <li><code>public/model/</code> -> <code>model/</code></li>
+            <li><code>public/knowledge/</code> -> <code>knowledge/</code></li>
+            <li><code>public/layers/</code> -> <code>layers/</code></li>
+          </ul>
+          <p>小程序端统一使用 CloudBase FileID 引用资源，避免把大视频、大模型和分层图打进主包，预览包体积已控制在约 220KB。</p>
+        </div>
+      </div>
+
+      <h2>技术栈与模块</h2>
+      <div class="cards">
+        <div class="card">
+          <h3>小程序前端</h3>
+          <p>原生微信小程序开发，核心页面包括 <code>home</code>、<code>ai-create</code>、<code>exploded-view</code>、<code>model3d-viewer</code> 等。</p>
+        </div>
+        <div class="card">
+          <h3>云函数与 API</h3>
+          <p>CloudBase 云函数负责 AI 生图与分色处理；独立 API 负责 3D 生成任务提交和状态查询。</p>
+        </div>
+        <div class="card">
+          <h3>图像处理</h3>
+          <p>使用像素级处理生成透明 PNG 图层，支持前端逐层叠加和色版交互。</p>
+        </div>
+        <div class="card">
+          <h3>工程治理</h3>
+          <p>处理包体积限制、私有 AppID 配置、密钥隔离、云端静态资源同步和 GitHub 分支发布。</p>
+        </div>
+      </div>
+
+      <div class="quote">
+        面试说明建议：这个项目可以从“非遗展示”切入，再展开到“AI 生成后的结构化处理”。重点强调你不仅调用了 AI 接口，还把生成结果转成可解释、可交互、可持续部署的产品功能。
+      </div>
+
+      <h2>后续计划</h2>
+      <ul>
+        <li>小程序正式上线后补充小程序码、体验链接和在线演示入口。</li>
+        <li>继续优化分色算法，减少复杂纹样边缘的串色和断裂。</li>
+        <li>完善 GitHub Actions 预览二维码产物、版本上传和发布记录。</li>
+      </ul>
+    </div>
+    <div class="footer">佛山木版年画 AI 创作小程序｜作品展示 2/2</div>
+  </section>
+</body>
+</html>

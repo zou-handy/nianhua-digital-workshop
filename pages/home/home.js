@@ -429,11 +429,52 @@ function buildAdvancedPreviewLayers(printedSteps) {
   });
 }
 
+const OPENING_PRINT_LAYERS = [
+  {
+    id: 'opening-ink',
+    name: '墨线',
+    shortName: '墨',
+    color: '#1A1A1A',
+    src: ADVANCED_PRINT_IMAGES.backendLayer3,
+    delay: 260,
+    zIndex: 4
+  },
+  {
+    id: 'opening-red',
+    name: '万年红',
+    shortName: '红',
+    color: '#D42F2F',
+    src: ADVANCED_PRINT_IMAGES.backendLayer0,
+    delay: 700,
+    zIndex: 1
+  },
+  {
+    id: 'opening-yellow',
+    name: '石黄',
+    shortName: '黄',
+    color: '#F2C94C',
+    src: ADVANCED_PRINT_IMAGES.backendLayer1,
+    delay: 1140,
+    zIndex: 2
+  },
+  {
+    id: 'opening-green',
+    name: '青绿',
+    shortName: '青',
+    color: '#5396AC',
+    src: ADVANCED_PRINT_IMAGES.backendLayer2,
+    delay: 1580,
+    zIndex: 3
+  }
+];
+
 Page({
   data: {
     IMAGES,
     VIDEOS,
     storyVideoUrl: '',
+    openingLayers: OPENING_PRINT_LAYERS,
+    openingPrintVisible: true,
     currentPage: 0,
     musicPlaying: false,
     musicTriggered: false,
@@ -578,6 +619,11 @@ Page({
 
   onUnload() {
     this.clearColorSequenceTimer();
+    if (this._openingReplayTimer) {
+      clearTimeout(this._openingReplayTimer);
+      this._openingReplayTimer = null;
+    }
+
     if (this._advancedBoardMoveTimer) {
       clearTimeout(this._advancedBoardMoveTimer);
       this._advancedBoardMoveTimer = null;
@@ -614,6 +660,23 @@ Page({
       this.setData({ musicPlaying: true, musicTriggered: true });
     }
     this.setData({ currentPage: 1 });
+  },
+
+  replayOpeningPrint() {
+    if (this._openingReplayTimer) {
+      clearTimeout(this._openingReplayTimer);
+      this._openingReplayTimer = null;
+    }
+
+    this.setData({ openingPrintVisible: false });
+    this._openingReplayTimer = setTimeout(() => {
+      this.setData({ openingPrintVisible: true });
+      this._openingReplayTimer = null;
+    }, 40);
+
+    if (wx.vibrateShort) {
+      wx.vibrateShort({ type: 'light' });
+    }
   },
 
   toggleMusic() {

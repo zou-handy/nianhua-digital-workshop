@@ -50,13 +50,51 @@
     <!-- ═══════════ 屏1 · 启 ═══════════ -->
     <swiper-item>
       <view class="screen screen-1">
+        <view class="s1-woodgrain"></view>
+        <view class="s1-red-wash"></view>
+
+        <view
+          class="s1-print-stage"
+          bindtap="replayOpeningPrint"
+        >
+          <view wx:if="{{openingPrintVisible}}" class="s1-print-inner s1-print-running">
+            <view class="s1-board-back"></view>
+            <view class="s1-paper">
+              <view class="s1-paper-fiber"></view>
+              <image
+                wx:for="{{openingLayers}}"
+                wx:key="id"
+                class="s1-print-layer"
+                src="{{item.src}}"
+                mode="aspectFit"
+                style="z-index:{{item.zIndex}}; animation-delay:{{item.delay}}ms;"
+              ></image>
+              <view class="s1-ink-sweep"></view>
+              <view class="s1-print-seal">
+                <text class="s1-print-seal-text">印</text>
+              </view>
+            </view>
+            <view class="s1-process-row">
+              <view
+                wx:for="{{openingLayers}}"
+                wx:key="id"
+                class="s1-process-step"
+                style="animation-delay:{{item.delay}}ms;"
+              >
+                <view class="s1-process-dot" style="background:{{item.color}};"></view>
+                <text class="s1-process-name">{{item.name}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
         <view class="s1-content">
-          <view class="s1-seal">非遗 · 探索</view>
+          <view class="s1-seal">一版一色</view>
           <view class="s1-line"></view>
           <text class="s1-subtitle">FOSHAN WOODBLOCK NEW YEAR PRINTS</text>
-          <text class="s1-subtitle-cn">国家级非物质文化遗产 · 数字探索</text>
+          <text class="s1-subtitle-cn">国家级非物质文化遗产 · 数字套印</text>
           <text class="s1-title">佛山木版年画</text>
-          <text class="s1-desc">刀锋与木纹之间，藏着三百年的故事</text>
+          <text class="s1-desc">让三百年刀木，在屏幕上重新套印</text>
           <view class="s1-wood-bar"></view>
         </view>
 

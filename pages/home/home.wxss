@@ -2049,6 +2049,401 @@ page {
   animation: fadeUp 1.4s ease-out 0.5s both;
 }
 
+/* ── 封面 · 套印揭幕 ── */
+.screen-1 {
+  justify-content: flex-start;
+  align-items: center;
+  padding: 126rpx 42rpx 118rpx;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(12, 6, 3, 0.18) 0%, rgba(12, 6, 3, 0.72) 100%),
+    #0f0805;
+}
+
+.s1-woodgrain,
+.s1-red-wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.s1-woodgrain {
+  z-index: 0;
+  opacity: 0.28;
+  background:
+    repeating-linear-gradient(
+      92deg,
+      rgba(255, 247, 230, 0.04),
+      rgba(255, 247, 230, 0.04) 1rpx,
+      transparent 1rpx,
+      transparent 18rpx
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(80, 35, 10, 0.14),
+      rgba(80, 35, 10, 0.14) 2rpx,
+      transparent 2rpx,
+      transparent 32rpx
+    );
+}
+
+.s1-red-wash {
+  z-index: 0;
+  opacity: 0.72;
+  background:
+    linear-gradient(135deg, rgba(196, 30, 58, 0.2) 0%, rgba(196, 30, 58, 0.04) 36%, transparent 62%),
+    linear-gradient(315deg, rgba(45, 93, 161, 0.14) 0%, transparent 44%);
+}
+
+.s1-print-stage {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 640rpx;
+  height: 548rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: s1StageIn 0.52s ease-out both;
+}
+
+.s1-print-stage:active {
+  transform: scale(0.99);
+}
+
+.s1-print-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.s1-board-back {
+  position: absolute;
+  left: 36rpx;
+  right: 36rpx;
+  top: 46rpx;
+  height: 380rpx;
+  border-radius: 8rpx;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 247, 230, 0.06),
+      rgba(255, 247, 230, 0.06) 2rpx,
+      transparent 2rpx,
+      transparent 22rpx
+    ),
+    linear-gradient(180deg, #6B3A20 0%, #331609 100%);
+  border: 1rpx solid rgba(230, 168, 23, 0.18);
+  box-shadow:
+    inset 0 12rpx 24rpx rgba(255, 247, 230, 0.05),
+    0 28rpx 70rpx rgba(0, 0, 0, 0.46);
+  transform: rotate(-3deg);
+}
+
+.s1-paper {
+  position: relative;
+  width: 500rpx;
+  height: 392rpx;
+  border-radius: 8rpx;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(80, 35, 10, 0.05), transparent 28%, rgba(255, 255, 255, 0.18) 50%, transparent 72%, rgba(80, 35, 10, 0.06)),
+    #F3E4C4;
+  border: 1rpx solid rgba(77, 35, 13, 0.36);
+  box-shadow:
+    inset 0 0 0 12rpx rgba(255, 255, 255, 0.16),
+    inset 0 0 54rpx rgba(80, 35, 10, 0.14),
+    0 24rpx 64rpx rgba(0, 0, 0, 0.48);
+  transform-origin: 50% 82%;
+  animation: s1PaperPress 2.42s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
+}
+
+.s1-paper-fiber {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(112, 77, 42, 0.055),
+      rgba(112, 77, 42, 0.055) 1rpx,
+      transparent 1rpx,
+      transparent 9rpx
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.08) 1rpx,
+      transparent 1rpx,
+      transparent 15rpx
+    );
+}
+
+.s1-print-layer {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 444rpx;
+  height: 344rpx;
+  opacity: 0;
+  transform: translate(-50%, -58%) scale(1.08);
+  mix-blend-mode: multiply;
+}
+
+.s1-print-running .s1-print-layer {
+  animation: s1LayerPrint 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.s1-ink-sweep {
+  position: absolute;
+  left: -24%;
+  top: 16%;
+  z-index: 9;
+  width: 46%;
+  height: 70%;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 247, 230, 0.28) 48%, transparent 100%);
+  transform: skewX(-18deg);
+}
+
+.s1-print-running .s1-ink-sweep {
+  animation: s1InkSweep 1.72s ease-out 0.36s both;
+}
+
+.s1-print-seal {
+  position: absolute;
+  right: 28rpx;
+  bottom: 26rpx;
+  z-index: 12;
+  width: 62rpx;
+  height: 62rpx;
+  border-radius: 4rpx;
+  background: rgba(196, 30, 58, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset 0 0 0 3rpx rgba(255, 247, 230, 0.18),
+    0 8rpx 20rpx rgba(196, 30, 58, 0.3);
+  opacity: 0;
+  transform: scale(1.26) rotate(-8deg);
+  animation: s1SealDrop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) 2.08s both;
+}
+
+.s1-print-seal-text {
+  font-size: 34rpx;
+  color: #fff7e6;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.s1-process-row {
+  width: 500rpx;
+  margin-top: 28rpx;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8rpx;
+}
+
+.s1-process-step {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  opacity: 0;
+  transform: translateY(12rpx);
+  animation: s1ProcessIn 0.36s ease-out both;
+}
+
+.s1-process-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  border: 1rpx solid rgba(255, 247, 230, 0.22);
+  flex-shrink: 0;
+}
+
+.s1-process-name {
+  max-width: 86rpx;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 19rpx;
+  color: rgba(255, 247, 230, 0.56);
+  letter-spacing: 1rpx;
+}
+
+.s1-content {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  max-width: 660rpx;
+  gap: 14rpx;
+  margin-top: -8rpx;
+  text-align: center;
+}
+
+.s1-seal {
+  margin-bottom: 12rpx;
+  padding: 8rpx 18rpx;
+  border-radius: 4rpx;
+  color: #fff7e6;
+  background: rgba(196, 30, 58, 0.72);
+  border: 1rpx solid rgba(255, 247, 230, 0.22);
+  box-shadow: 0 8rpx 26rpx rgba(196, 30, 58, 0.24);
+  animation: fadeUp 0.62s ease-out 1.78s both;
+}
+
+.s1-line {
+  width: 86rpx;
+  margin-bottom: 14rpx;
+  background: linear-gradient(90deg, transparent, rgba(230, 168, 23, 0.78), transparent);
+}
+
+.s1-subtitle {
+  font-size: 21rpx;
+  color: rgba(255, 247, 230, 0.42);
+  animation: fadeUp 0.62s ease-out 1.92s both;
+}
+
+.s1-subtitle-cn {
+  margin-top: -4rpx;
+  font-size: 21rpx;
+  color: rgba(255, 247, 230, 0.58);
+  animation: fadeUp 0.62s ease-out 2.02s both;
+}
+
+.s1-title {
+  font-size: 76rpx;
+  font-weight: 500;
+  color: #fff7e6;
+  text-shadow:
+    0 2rpx 0 rgba(77, 35, 13, 0.7),
+    0 18rpx 44rpx rgba(0, 0, 0, 0.48);
+  animation: fadeUp 0.7s ease-out 2.12s both;
+}
+
+.s1-desc {
+  margin-top: 6rpx;
+  font-size: 26rpx;
+  color: rgba(255, 247, 230, 0.62);
+  animation: fadeUp 0.7s ease-out 2.24s both;
+}
+
+.s1-wood-bar {
+  width: 148rpx;
+  height: 3rpx;
+  margin-top: 16rpx;
+  background: linear-gradient(90deg, transparent, #E6A817 20%, #D42F2F 50%, #5396AC 80%, transparent);
+  animation: fadeUp 0.7s ease-out 2.36s both;
+}
+
+.s1-bottom {
+  z-index: 4;
+  bottom: 72rpx;
+}
+
+.arrow-text {
+  color: rgba(255, 247, 230, 0.38);
+}
+
+.arrow-hint {
+  color: rgba(255, 247, 230, 0.32);
+}
+
+@keyframes s1StageIn {
+  from {
+    opacity: 0;
+    transform: translateY(24rpx) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes s1PaperPress {
+  0% {
+    transform: translateY(-18rpx) rotate(-2deg) scale(0.98);
+  }
+  16% {
+    transform: translateY(0) rotate(0deg) scale(1.01);
+  }
+  30%,
+  68% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  78% {
+    transform: translateY(6rpx) rotate(0deg) scale(0.992);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+}
+
+@keyframes s1LayerPrint {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -62%) scale(1.12);
+  }
+  58% {
+    opacity: 0.98;
+    transform: translate(-50%, -50%) scale(0.985);
+  }
+  100% {
+    opacity: 0.96;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes s1InkSweep {
+  0% {
+    opacity: 0;
+    transform: translateX(0) skewX(-18deg);
+  }
+  18% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(720rpx) skewX(-18deg);
+  }
+}
+
+@keyframes s1SealDrop {
+  0% {
+    opacity: 0;
+    transform: scale(1.26) rotate(-8deg);
+  }
+  72% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-3deg);
+  }
+}
+
+@keyframes s1ProcessIn {
+  from {
+    opacity: 0;
+    transform: translateY(12rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ═════════════════════════════════════════════
    屏 · 刀具图鉴
    ═════════════════════════════════════════════ */

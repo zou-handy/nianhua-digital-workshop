@@ -1,7 +1,6 @@
 const USER_CACHE_KEY = 'userColorLayers';
-const PRESET_CACHE_KEY = 'presetColorLayersCloudV1';
+const PRESET_CACHE_KEY = 'presetColorLayersCloudV2';
 const { layerFileID } = require('../../constants/cloudAssets');
-const { downloadCloudFile } = require('./utils/downloadCloudFile');
 const { requestSplitColors } = require('./utils/splitColors');
 const { saveLayerImage } = require('./utils/saveLayerImage');
 
@@ -379,7 +378,7 @@ Page({
       try {
         let layers = this._getCachedPresetLayers(gallery, cache[gallery.id]);
         if (layers.length !== gallery.layerCount) {
-          this.setData({ loadingProgress: '下载' + gallery.title });
+          this.setData({ loadingProgress: '加载' + gallery.title });
           layers = await this._downloadPresetLayers(gallery);
         }
         if (layers.length === gallery.layerCount) {
@@ -412,7 +411,7 @@ Page({
 
   _getCachedPresetLayers(gallery, cachedGallery) {
     if (!cachedGallery || !Array.isArray(cachedGallery.layers)) {
-      const expectedLayers = this._buildPresetLayersFromLocalPaths(gallery);
+      const expectedLayers = this._buildPresetLayersFromCloudPaths(gallery);
       if (this._areLayerFilesValid(expectedLayers)) return expectedLayers;
       return [];
     }
@@ -423,50 +422,29 @@ Page({
       this._areLayerFilesValid(storedLayers)
     ) {
       return storedLayers.map((layer, index) => ({
-        tempPath: layer.tempPath,
+        tempPath: layer.fileID || layer.tempPath,
+        fileID: layer.fileID || (this._isCloudFilePath(layer.tempPath) ? layer.tempPath : ''),
         color: layer.color || (PRESET_LAYER_META[index] ? PRESET_LAYER_META[index].color : ''),
         label: layer.label || (PRESET_LAYER_META[index] ? PRESET_LAYER_META[index].label : '图层' + (index + 1))
       }));
     }
 
-    const expectedLayers = this._buildPresetLayersFromLocalPaths(gallery);
+    const expectedLayers = this._buildPresetLayersFromCloudPaths(gallery);
     if (this._areLayerFilesValid(expectedLayers)) return expectedLayers;
     return [];
   },
 
-  _buildPresetLayersFromLocalPaths(gallery) {
+  _buildPresetLayersFromCloudPaths(gallery) {
     return Array.from({ length: gallery.layerCount }, (_, index) => ({
-      tempPath: `${wx.env.USER_DATA_PATH}/layer_${gallery.id}_${index}.png`,
+      tempPath: layerFileID(gallery.cloudPrefix, index),
+      fileID: layerFileID(gallery.cloudPrefix, index),
       color: PRESET_LAYER_META[index].color,
       label: PRESET_LAYER_META[index].label
     }));
   },
 
   async _downloadPresetLayers(gallery) {
-    const layers = [];
-    for (let i = 0; i < gallery.layerCount; i++) {
-      try {
-        const tempPath = await this._downloadPresetLayer(gallery, i);
-        layers.push({
-          tempPath,
-          color: PRESET_LAYER_META[i].color,
-          label: PRESET_LAYER_META[i].label
-        });
-      } catch (err) {
-        console.error('[分色展厅] 预置图层下载失败:', gallery.id, i, err);
-      }
-    }
-    return layers.length === gallery.layerCount ? layers : [];
-  },
-
-  async _downloadPresetLayer(gallery, index) {
-    const fileID = layerFileID(gallery.cloudPrefix, index);
-    const tempPath = await downloadCloudFile(fileID);
-    const fs = wx.getFileSystemManager();
-    const savePath = `${wx.env.USER_DATA_PATH}/layer_${gallery.id}_${index}.png`;
-    try { fs.unlinkSync(savePath); } catch (err) { /* 忽略 */ }
-    fs.saveFileSync(tempPath, savePath);
-    return savePath;
+    return this._buildPresetLayersFromCloudPaths(gallery);
   },
 
   _getValidUserGalleries() {
