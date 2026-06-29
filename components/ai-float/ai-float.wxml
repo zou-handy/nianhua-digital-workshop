@@ -1,0 +1,96 @@
+<!-- 悬浮AI助手 -->
+<view
+  class="ai-float-btn {{isDragging ? 'dragging' : ''}} {{chatOpen ? 'hidden' : ''}}"
+  style="left:{{btnX}}px;top:{{btnY}}px;"
+  bindtap="openChat"
+  catchtouchstart="onTouchStart"
+  catchtouchmove="onTouchMove"
+  catchtouchend="onTouchEnd"
+>
+  <view class="ai-float-inner">
+    <text class="ai-float-icon">年</text>
+    <view class="ai-float-pulse"></view>
+  </view>
+</view>
+
+<!-- 聊天弹窗 -->
+<view class="ai-chat-overlay {{chatOpen ? 'show' : ''}}" bindtap="closeChat">
+  <view class="ai-chat-panel" catchtap="noop">
+    <!-- 标题栏 -->
+    <view class="ai-panel-header">
+      <view class="ai-panel-avatar">
+        <text class="ai-panel-avatar-text">年</text>
+      </view>
+      <view class="ai-panel-title-wrap">
+        <text class="ai-panel-title">小年</text>
+        <text class="ai-panel-status">{{isRunning ? '思考中...' : '年画传承助手'}}</text>
+      </view>
+      <view class="ai-panel-close" bindtap="closeChat">
+        <text class="ai-close-icon">✕</text>
+      </view>
+    </view>
+
+    <!-- 消息区 -->
+    <scroll-view
+      class="ai-panel-messages"
+      scroll-y
+      scroll-into-view="{{scrollToId}}"
+      scroll-with-animation
+      enhanced
+      show-scrollbar="{{false}}"
+    >
+      <view class="ai-welcome" wx:if="{{messages.length === 0}}">
+        <text class="ai-welcome-emoji">🏮</text>
+        <text class="ai-welcome-text">你好，我是小年</text>
+        <text class="ai-welcome-desc">{{pageContext}}</text>
+        <view class="ai-suggestions">
+          <view class="ai-suggestion" bindtap="sendSuggestion" data-text="{{suggestion1}}">
+            <text>{{suggestion1}}</text>
+          </view>
+          <view class="ai-suggestion" bindtap="sendSuggestion" data-text="{{suggestion2}}">
+            <text>{{suggestion2}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view
+        wx:for="{{messages}}"
+        wx:key="id"
+        id="float-msg-{{item.id}}"
+        class="ai-msg {{item.role === 'user' ? 'ai-msg-user' : 'ai-msg-bot'}}"
+      >
+        <view class="ai-msg-bubble {{item.role === 'user' ? 'ai-bubble-user' : 'ai-bubble-bot'}}">
+          <text class="ai-msg-text" user-select>{{item.content}}</text>
+        </view>
+      </view>
+
+      <view wx:if="{{isRunning}}" class="ai-msg ai-msg-bot">
+        <view class="ai-msg-bubble ai-bubble-bot">
+          <view class="ai-typing">
+            <view class="ai-typing-dot"></view>
+            <view class="ai-typing-dot"></view>
+            <view class="ai-typing-dot"></view>
+          </view>
+        </view>
+      </view>
+      <view class="ai-msg-bottom"></view>
+    </scroll-view>
+
+    <!-- 输入区 -->
+    <view class="ai-panel-input">
+      <input
+        class="ai-input"
+        placeholder="问小年..."
+        placeholder-class="ai-input-ph"
+        value="{{inputText}}"
+        bindinput="onInput"
+        bindconfirm="sendMessage"
+        confirm-type="send"
+        adjust-position
+      />
+      <view class="ai-send {{inputText ? 'active' : ''}}" bindtap="sendMessage">
+        <text class="ai-send-icon">↑</text>
+      </view>
+    </view>
+  </view>
+</view>

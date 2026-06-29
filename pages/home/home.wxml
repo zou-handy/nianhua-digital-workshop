@@ -679,4 +679,7 @@
       </view>
     </view>
   </view>
+
+  <!-- 全局悬浮AI助手 -->
+  <ai-float id="aiFloat"></ai-float>
 </view>

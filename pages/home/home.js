@@ -600,9 +600,8 @@ Page({
       finderUserName: 'sphAlrwGhzSZbx0'
     },
     videoPlaying: false,
-    // 视频号与小程序不同主体，使用跳转模式
-    // 同主体后改为 false 可启用 channel-video 内嵌
-    useFallbackMode: true,
+    // 企业主体+基础库2.31.1+ 支持非同主体feedToken内嵌
+    useFallbackMode: false,
 
     // 知识测验
     quiz: [
@@ -672,6 +671,12 @@ Page({
     if (!this.data.musicTriggered) {
       this.bgMusic.play();
       this.setData({ musicPlaying: true, musicTriggered: true });
+    }
+
+    // 更新AI助手上下文
+    const aiFloat = this.selectComponent('#aiFloat');
+    if (aiFloat) {
+      aiFloat.setPageContext({ chapter: this.data.chapters[page].name });
     }
   },
 
@@ -1430,15 +1435,13 @@ Page({
     console.error('[视频号] 播放出错:', e.detail);
     this.setData({ videoPlaying: false });
 
-    // 错误码 1416106：个人主体小程序无法内嵌非同主体视频号
     const errMsg = (e.detail && e.detail.errMsg) || '';
+    // 个人主体或权限不足时降级到跳转模式
     if (errMsg.indexOf('1416106') > -1 && !this.data.useFallbackMode) {
+      console.log('[视频号] 自动降级到跳转模式');
       this.setData({ useFallbackMode: true });
-      wx.showToast({ title: '已切换跳转模式', icon: 'none' });
       return;
     }
-
-    wx.showToast({ title: '视频加载失败', icon: 'none' });
   },
 
   openChannelsActivity() {
