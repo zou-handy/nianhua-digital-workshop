@@ -48,7 +48,7 @@ Page({
     });
 
     wx.cloud.callFunction({
-      name: 'generateImage-RA7PaB',
+      name: 'generateImage-PBKj5J',
       data: {
         prompt,
         model: 'hunyuan-image',

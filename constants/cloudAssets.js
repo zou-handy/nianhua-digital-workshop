@@ -1,4 +1,4 @@
-const CLOUD_BASE = 'cloud://cloudbase-d2ga3dspk593e200b.636c-cloudbase-d2ga3dspk593e200b-1424774211';
+const CLOUD_BASE = 'cloud://cloud1-d7g47tfdyf7a14a31.636c-cloud1-d7g47tfdyf7a14a31-1448457900';
 
 const MODELS = {
   house: `${CLOUD_BASE}/model/house.glb`,

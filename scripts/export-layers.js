@@ -107,4 +107,4 @@ async function main() {
   console.log('全部完成！');
 }
 
-main();
+main(); 

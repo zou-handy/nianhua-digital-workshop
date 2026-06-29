@@ -574,6 +574,36 @@ Page({
       }
     ],
 
+    // 视频号视频列表（非同主体：需填 feedToken + finderUserName）
+    channelVideos: [
+      {
+        title: '佛山年画起源',
+        desc: '三百年刀木薪传',
+        feedId: '',
+        feedToken: 'A1F9taYrIj',
+        finderUserName: 'sphAlrwGhzSZbx0'
+      },
+      {
+        title: '年画制作工艺',
+        desc: '一版一色的坚守',
+        feedId: '',
+        feedToken: 'A6ZMc6QeYG',
+        finderUserName: 'sphAlrwGhzSZbx0'
+      }
+    ],
+    currentVideoIndex: 0,
+    currentVideo: {
+      title: '佛山年画起源',
+      desc: '三百年刀木薪传',
+      feedId: '',
+      feedToken: 'A1F9taYrIj',
+      finderUserName: 'sphAlrwGhzSZbx0'
+    },
+    videoPlaying: false,
+    // 个人主体小程序无法内嵌非同主体视频，启用跳转降级模式
+    // 企业主体申请通过后，将此项设为 false 即可启用 channel-video 内嵌
+    useFallbackMode: true,
+
     // 知识测验
     quiz: [
       {
@@ -1344,6 +1374,108 @@ Page({
       quizFinished: false,
       selectedOption: -1,
       showExplanation: false
+    });
+  },
+
+  // ── 视频号视频 ──
+
+  switchVideo(e) {
+    const index = parseInt(e.currentTarget.dataset.index, 10);
+    this.updateCurrentVideo(index);
+  },
+
+  prevNextVideo(e) {
+    const dir = parseInt(e.currentTarget.dataset.dir, 10);
+    const newIndex = this.data.currentVideoIndex + dir;
+    if (newIndex < 0 || newIndex >= this.data.channelVideos.length) return;
+    this.updateCurrentVideo(newIndex);
+  },
+
+  updateCurrentVideo(index) {
+    const video = this.data.channelVideos[index];
+    this.setData({
+      currentVideoIndex: index,
+      currentVideo: video
+    });
+  },
+
+  onVideoPlay() {
+    this.setData({ videoPlaying: true });
+    // 播放视频时暂停背景音乐
+    if (this.bgMusic && this.data.musicPlaying) {
+      this.bgMusic.pause();
+      this.setData({ musicPlaying: false });
+    }
+  },
+
+  onVideoPause() {
+    this.setData({ videoPlaying: false });
+    // 视频暂停后恢复背景音乐（如果之前是播放状态）
+    if (this.bgMusic && this.data.musicTriggered && !this.data.musicPlaying) {
+      this.bgMusic.play();
+      this.setData({ musicPlaying: true });
+    }
+  },
+
+  onVideoEnded() {
+    this.setData({ videoPlaying: false });
+    // 视频结束后恢复背景音乐
+    if (this.bgMusic && this.data.musicTriggered && !this.data.musicPlaying) {
+      this.bgMusic.play();
+      this.setData({ musicPlaying: true });
+    }
+  },
+
+  onVideoError(e) {
+    console.error('[视频号] 播放出错:', e.detail);
+    this.setData({ videoPlaying: false });
+
+    // 错误码 1416106：个人主体小程序无法内嵌非同主体视频号
+    const errMsg = (e.detail && e.detail.errMsg) || '';
+    if (errMsg.indexOf('1416106') > -1 && !this.data.useFallbackMode) {
+      this.setData({ useFallbackMode: true });
+      wx.showToast({ title: '已切换跳转模式', icon: 'none' });
+      return;
+    }
+
+    wx.showToast({ title: '视频加载失败', icon: 'none' });
+  },
+
+  openChannelsActivity() {
+    const video = this.data.currentVideo;
+    if (!video.finderUserName || video.finderUserName === 'sph_xxxxxxxx') {
+      wx.showToast({ title: '请先配置视频号参数', icon: 'none' });
+      return;
+    }
+
+    // 有 feedId 时打开特定视频；只有 feedToken 时打开视频号主页
+    if (video.feedId) {
+      wx.openChannelsActivity({
+        finderUserName: video.finderUserName,
+        feedId: video.feedId,
+        success: () => {
+          console.log('[视频号] 跳转视频成功');
+        },
+        fail: (err) => {
+          console.error('[视频号] 跳转视频失败:', err);
+          this.openChannelsUserProfile(video.finderUserName);
+        }
+      });
+    } else {
+      this.openChannelsUserProfile(video.finderUserName);
+    }
+  },
+
+  openChannelsUserProfile(finderUserName) {
+    wx.openChannelsUserProfile({
+      finderUserName: finderUserName,
+      success: () => {
+        console.log('[视频号] 跳转主页成功');
+      },
+      fail: (err) => {
+        console.error('[视频号] 跳转主页失败:', err);
+        wx.showToast({ title: '跳转视频号失败', icon: 'none' });
+      }
     });
   },
 

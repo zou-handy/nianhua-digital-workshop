@@ -412,46 +412,126 @@
       </view>
     </swiper-item>
 
-    <!-- ═══════════ 屏6 · 考 ═══════════ -->
+    <!-- ═══════════ 屏7 · 考 · 视频号观影+测验 ═══════════ -->
     <swiper-item>
-      <view class="screen screen-quiz">
-        <text class="screen-label">测 验</text>
-        <text class="screen-heading">考考你</text>
+      <view class="screen screen-video-quiz">
+        <view class="video-quiz-header">
+          <text class="screen-label">测 验</text>
+          <text class="screen-heading">视频学堂</text>
+          <text class="video-quiz-hint">观看视频，挑战考题</text>
+        </view>
 
-        <block wx:if="{{!quizFinished}}">
-          <text class="quiz-progress">{{currentQuestion + 1}} / {{quiz.length}}</text>
-          <text class="quiz-question">{{quiz[currentQuestion].question}}</text>
-
-          <view class="quiz-options">
+        <!-- 视频号视频区 -->
+        <view class="video-section">
+          <view class="video-tabs">
             <view
-              wx:for="{{quiz[currentQuestion].options}}"
+              wx:for="{{channelVideos}}"
               wx:key="index"
-              wx:for-item="option"
-              class="quiz-opt {{showExplanation && index === quiz[currentQuestion].answer ? 'quiz-correct' : ''}} {{showExplanation && index === selectedOption && index !== quiz[currentQuestion].answer ? 'quiz-wrong' : ''}}"
+              class="video-tab {{currentVideoIndex === index ? 'video-tab-active' : ''}}"
               data-index="{{index}}"
-              bindtap="selectQuizOption"
+              bindtap="switchVideo"
             >
-              <text class="quiz-opt-text">{{option}}</text>
+              <text class="video-tab-text">{{item.title}}</text>
             </view>
           </view>
 
-          <view wx:if="{{showExplanation}}" class="quiz-explain">
-            <text class="quiz-explain-text">{{quiz[currentQuestion].explanation}}</text>
-          </view>
-        </block>
-
-        <block wx:if="{{quizFinished}}">
-          <view class="quiz-result">
-            <text class="quiz-score-num">{{quizScore}}/{{quiz.length}}</text>
-            <text wx:if="{{quizScore === 3}}" class="quiz-msg">年画大师！了如指掌。</text>
-            <text wx:elif="{{quizScore === 2}}" class="quiz-msg">不错，已有不少了解。</text>
-            <text wx:elif="{{quizScore === 1}}" class="quiz-msg">继续探索，精彩无限。</text>
-            <text wx:else class="quiz-msg">没关系，往回滑看看知识点。</text>
-            <view class="quiz-reset" bindtap="resetQuiz">
-              <text class="quiz-reset-text">重新答题</text>
+          <!-- 模式A：企业主体/同主体时内嵌播放 -->
+          <view class="video-player-wrap" wx:if="{{!useFallbackMode}}">
+            <channel-video
+              wx:if="{{currentVideo.feedId || currentVideo.feedToken}}"
+              class="channel-video-player"
+              feed-id="{{currentVideo.feedId}}"
+              feed-token="{{currentVideo.feedToken}}"
+              finder-user-name="{{currentVideo.finderUserName}}"
+              autoplay="{{false}}"
+              object-fit="contain"
+              bindplay="onVideoPlay"
+              bindpause="onVideoPause"
+              bindended="onVideoEnded"
+              binderror="onVideoError"
+            ></channel-video>
+            <view wx:else class="video-placeholder" bindtap="openChannelsActivity">
+              <view class="video-placeholder-icon">▶</view>
+              <text class="video-placeholder-title">{{currentVideo.title}}</text>
+              <text class="video-placeholder-desc">点击跳转视频号观看</text>
             </view>
           </view>
-        </block>
+
+          <!-- 模式B：个人主体时跳转卡片 -->
+          <view class="video-fallback-card" wx:if="{{useFallbackMode}}" bindtap="openChannelsActivity">
+            <view class="video-fallback-icon">
+              <text class="video-fallback-play">▶</text>
+            </view>
+            <view class="video-fallback-info">
+              <text class="video-fallback-title">{{currentVideo.title}}</text>
+              <text class="video-fallback-desc">{{currentVideo.desc}}</text>
+              <view class="video-fallback-badge">
+                <text class="video-fallback-badge-text">打开视频号主页</text>
+                <text class="video-fallback-arrow">↗</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="video-nav">
+            <view class="video-nav-btn {{currentVideoIndex === 0 ? 'video-nav-disabled' : ''}}" data-dir="-1" bindtap="prevNextVideo">
+              <text class="video-nav-arrow">◀</text>
+              <text class="video-nav-label">上一个</text>
+            </view>
+            <text class="video-nav-count">{{currentVideoIndex + 1}} / {{channelVideos.length}}</text>
+            <view class="video-nav-btn {{currentVideoIndex === channelVideos.length - 1 ? 'video-nav-disabled' : ''}}" data-dir="1" bindtap="prevNextVideo">
+              <text class="video-nav-label">下一个</text>
+              <text class="video-nav-arrow">▶</text>
+            </view>
+          </view>
+
+          <view wx:if="{{useFallbackMode}}" class="video-fallback-tip">
+            <text class="video-fallback-tip-text">当前为个人主体小程序，点击打开视频号主页浏览相关视频。企业主体认证后可内嵌播放。</text>
+          </view>
+        </view>
+
+        <!-- 考考你区 -->
+        <view class="quiz-section">
+          <view class="quiz-divider">
+            <view class="quiz-divider-line"></view>
+            <text class="quiz-divider-text">考 考 你</text>
+            <view class="quiz-divider-line"></view>
+          </view>
+
+          <block wx:if="{{!quizFinished}}">
+            <text class="quiz-progress">{{currentQuestion + 1}} / {{quiz.length}}</text>
+            <text class="quiz-question">{{quiz[currentQuestion].question}}</text>
+
+            <view class="quiz-options">
+              <view
+                wx:for="{{quiz[currentQuestion].options}}"
+                wx:key="index"
+                wx:for-item="option"
+                class="quiz-opt {{showExplanation && index === quiz[currentQuestion].answer ? 'quiz-correct' : ''}} {{showExplanation && index === selectedOption && index !== quiz[currentQuestion].answer ? 'quiz-wrong' : ''}}"
+                data-index="{{index}}"
+                bindtap="selectQuizOption"
+              >
+                <text class="quiz-opt-text">{{option}}</text>
+              </view>
+            </view>
+
+            <view wx:if="{{showExplanation}}" class="quiz-explain">
+              <text class="quiz-explain-text">{{quiz[currentQuestion].explanation}}</text>
+            </view>
+          </block>
+
+          <block wx:if="{{quizFinished}}">
+            <view class="quiz-result">
+              <text class="quiz-score-num">{{quizScore}}/{{quiz.length}}</text>
+              <text wx:if="{{quizScore === quiz.length}}" class="quiz-msg">年画大师！了如指掌。</text>
+              <text wx:elif="{{quizScore >= quiz.length * 0.6}}" class="quiz-msg">不错，已有不少了解。</text>
+              <text wx:elif="{{quizScore >= quiz.length * 0.3}}" class="quiz-msg">继续探索，精彩无限。</text>
+              <text wx:else class="quiz-msg">没关系，往回滑看看知识点。</text>
+              <view class="quiz-reset" bindtap="resetQuiz">
+                <text class="quiz-reset-text">重新答题</text>
+              </view>
+            </view>
+          </block>
+        </view>
       </view>
     </swiper-item>
 

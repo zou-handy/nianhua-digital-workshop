@@ -87,10 +87,6 @@
         "value": "miniprogram_npm/threejs-miniprogram"
       },
       {
-        "type": "file",
-        "value": "pages/model3d-viewer/vendor/three-platformize/index.js"
-      },
-      {
         "type": "folder",
         "value": "cloudfunctions"
       },
@@ -286,7 +282,7 @@
   },
   "compileType": "miniprogram",
   "libVersion": "2.33.0",
-  "appid": "touristappid",
+  "appid": "wxa2eb9bd274d2af5e",
   "projectname": "foshan-nianhua",
   "condition": {},
   "editorSetting": {

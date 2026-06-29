@@ -1,6 +1,6 @@
-const THREE = require('./vendor/three-platformize/build/three.module')
-const WechatPlatformModule = require('./vendor/three-platformize/src/WechatPlatform')
-const { GLTFLoader } = require('./vendor/three-platformize/examples/jsm/loaders/GLTFLoader')
+const THREE = require('./vendor/three-platformize/build/three.module.js')
+const WechatPlatformModule = require('./vendor/three-platformize/src/WechatPlatform/index.js')
+const { GLTFLoader } = require('./vendor/three-platformize/examples/jsm/loaders/GLTFLoader.js')
 const { downloadFileToTemp } = require('./utils/downloadCloudFile')
 
 const WechatPlatform = WechatPlatformModule.default || WechatPlatformModule.WechatPlatform || WechatPlatformModule
