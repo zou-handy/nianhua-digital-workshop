@@ -600,8 +600,9 @@ Page({
       finderUserName: 'sphAlrwGhzSZbx0'
     },
     videoPlaying: false,
-    // 企业主体已通过，启用 channel-video 内嵌播放
-    useFallbackMode: false,
+    // 视频号与小程序不同主体，使用跳转模式
+    // 同主体后改为 false 可启用 channel-video 内嵌
+    useFallbackMode: true,
 
     // 知识测验
     quiz: [
@@ -1473,6 +1474,15 @@ Page({
       },
       fail: (err) => {
         console.error('[视频号] 跳转主页失败:', err);
+        const errMsg = (err && err.errMsg) || '';
+        if (errMsg.indexOf('开发者工具') > -1) {
+          wx.showModal({
+            title: '请在真机预览',
+            content: '视频号跳转功能需要在真机微信中预览体验，开发者工具暂不支持。\n\n请点击右上角"预览"，用手机微信扫码体验。',
+            showCancel: false
+          });
+          return;
+        }
         wx.showToast({ title: '跳转视频号失败', icon: 'none' });
       }
     });
