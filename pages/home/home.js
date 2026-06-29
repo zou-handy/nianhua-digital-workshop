@@ -600,9 +600,8 @@ Page({
       finderUserName: 'sphAlrwGhzSZbx0'
     },
     videoPlaying: false,
-    // 个人主体小程序无法内嵌非同主体视频，启用跳转降级模式
-    // 企业主体申请通过后，将此项设为 false 即可启用 channel-video 内嵌
-    useFallbackMode: true,
+    // 企业主体已通过，启用 channel-video 内嵌播放
+    useFallbackMode: false,
 
     // 知识测验
     quiz: [
@@ -1518,5 +1517,9 @@ Page({
 
   goToAiHome() {
     wx.navigateTo({ url: '/pages/index/index' });
+  },
+
+  goToAiChat() {
+    wx.navigateTo({ url: '/pages/ai-chat/ai-chat' });
   }
 });

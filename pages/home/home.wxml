@@ -544,6 +544,13 @@
         </view>
 
         <view class="explore-grid">
+          <view class="explore-card explore-ai-chat" bindtap="goToAiChat">
+            <view class="explore-card-bg" style="background: linear-gradient(135deg, #C41E3A, #E6A817);"></view>
+            <view class="explore-card-mask"></view>
+            <text class="explore-card-title">小年 AI</text>
+            <text class="explore-card-hint">对话 · 问答 · 传承</text>
+          </view>
+
           <view class="explore-card explore-3d" bindtap="goTo3D">
             <image class="explore-card-bg" src="{{IMAGES.swordDanceFront}}" mode="aspectFill"></image>
             <view class="explore-card-mask"></view>

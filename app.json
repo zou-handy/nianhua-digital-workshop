@@ -6,6 +6,12 @@
   ],
   "subPackages": [
     {
+      "root": "pages/ai-chat",
+      "pages": [
+        "ai-chat"
+      ]
+    },
+    {
       "root": "pages/ai-create",
       "pages": [
         "ai-create"

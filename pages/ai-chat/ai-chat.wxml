@@ -1,0 +1,89 @@
+<view class="chat-page">
+  <!-- 顶部导航 -->
+  <view class="chat-header">
+    <view class="chat-back" bindtap="goBack">
+      <text class="chat-back-icon">←</text>
+    </view>
+    <view class="chat-avatar-wrap">
+      <image class="chat-avatar" src="https://cloudcache.tencent-cloud.com/qcloud/ui/static/static_source_business/21235b0d-8db2-4e30-b946-3973e6f99c00.png" mode="aspectFill"></image>
+    </view>
+    <view class="chat-title-wrap">
+      <text class="chat-title">小年</text>
+      <text class="chat-status">{{isRunning ? '正在思考...' : '佛山年画传承助手'}}</text>
+    </view>
+  </view>
+
+  <!-- 消息列表 -->
+  <scroll-view
+    class="chat-messages"
+    scroll-y
+    scroll-into-view="{{scrollToId}}"
+    scroll-with-animation
+    enhanced
+    show-scrollbar="{{false}}"
+  >
+    <view class="chat-welcome" wx:if="{{messages.length === 0}}">
+      <view class="chat-welcome-icon">🏮</view>
+      <text class="chat-welcome-title">你好，我是小年</text>
+      <text class="chat-welcome-desc">佛山木版年画数字传承助手</text>
+      <view class="chat-suggestions">
+        <view class="chat-suggestion" bindtap="sendSuggestion" data-text="佛山年画有什么特色？">
+          <text>佛山年画有什么特色？</text>
+        </view>
+        <view class="chat-suggestion" bindtap="sendSuggestion" data-text="五色套印是什么工艺？">
+          <text>五色套印是什么工艺？</text>
+        </view>
+        <view class="chat-suggestion" bindtap="sendSuggestion" data-text="门神有哪些故事？">
+          <text>门神有哪些故事？</text>
+        </view>
+      </view>
+    </view>
+
+    <view
+      wx:for="{{messages}}"
+      wx:key="id"
+      id="msg-{{item.id}}"
+      class="msg-row {{item.role === 'user' ? 'msg-user' : 'msg-assistant'}}"
+    >
+      <image
+        wx:if="{{item.role === 'assistant'}}"
+        class="msg-avatar"
+        src="https://cloudcache.tencent-cloud.com/qcloud/ui/static/static_source_business/21235b0d-8db2-4e30-b946-3973e6f99c00.png"
+        mode="aspectFill"
+      ></image>
+      <view class="msg-bubble {{item.role === 'user' ? 'bubble-user' : 'bubble-assistant'}}">
+        <text class="msg-text" user-select>{{item.content}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{isRunning && messages.length > 0}}" class="msg-row msg-assistant">
+      <image class="msg-avatar" src="https://cloudcache.tencent-cloud.com/qcloud/ui/static/static_source_business/21235b0d-8db2-4e30-b946-3973e6f99c00.png" mode="aspectFill"></image>
+      <view class="msg-bubble bubble-assistant">
+        <view class="typing-indicator">
+          <view class="typing-dot"></view>
+          <view class="typing-dot"></view>
+          <view class="typing-dot"></view>
+        </view>
+      </view>
+    </view>
+
+    <view class="chat-bottom-spacer"></view>
+  </scroll-view>
+
+  <!-- 输入区 -->
+  <view class="chat-input-area">
+    <input
+      class="chat-input"
+      placeholder="问小年关于年画的问题..."
+      placeholder-class="chat-input-placeholder"
+      value="{{inputText}}"
+      bindinput="onInput"
+      bindconfirm="sendMessage"
+      confirm-type="send"
+      adjust-position
+    />
+    <view class="chat-send-btn {{inputText ? 'send-active' : ''}}" bindtap="sendMessage">
+      <text class="chat-send-icon">↑</text>
+    </view>
+  </view>
+</view>
