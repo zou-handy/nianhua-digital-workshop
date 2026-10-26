@@ -1,10 +1,13 @@
 const { requestSplitColors } = require('./utils/splitColors');
 const { saveLayerImage } = require('./utils/saveLayerImage');
+const { buildShareAppMessage } = require('../../utils/shareConfig');
 
 const USER_CACHE_KEY = 'userColorLayers';
 const MAX_USER_RECORDS = 10;
 
 Page({
+  onShareAppMessage: buildShareAppMessage,
+
   data: {
     previewImage: '',
     analyzing: false,

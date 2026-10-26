@@ -10,7 +10,13 @@ page {
 }
 
 .header {
-  margin-bottom: 40rpx;
+  margin-bottom: 24rpx;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
 }
 
 .title {
@@ -20,12 +26,43 @@ page {
   letter-spacing: 0;
 }
 
+/* AI生成标识徽章 */
+.ai-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4rpx 14rpx;
+  border-radius: 8rpx;
+  background: linear-gradient(135deg, rgba(196, 30, 58, 0.9), rgba(230, 168, 23, 0.9));
+  color: #fff7e6;
+  font-size: 22rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+}
+
 .subtitle {
   display: block;
   margin-top: 16rpx;
   color: rgba(255, 241, 207, 0.62);
   font-size: 24rpx;
   line-height: 1.5;
+}
+
+/* AI生成内容显著提示条 */
+.ai-notice-bar {
+  margin-bottom: 36rpx;
+  padding: 16rpx 24rpx;
+  background: rgba(230, 168, 23, 0.12);
+  border: 1rpx solid rgba(230, 168, 23, 0.25);
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-notice-text {
+  font-size: 24rpx;
+  color: rgba(248, 229, 169, 0.9);
+  letter-spacing: 1rpx;
 }
 
 .form-panel {
@@ -85,12 +122,32 @@ page {
   margin-top: 44rpx;
 }
 
+.result-image-wrap {
+  position: relative;
+  width: 100%;
+}
+
 .result-image {
   width: 100%;
   height: 760rpx;
   border-radius: 24rpx;
   background: rgba(255, 255, 255, 0.04);
   box-shadow: 0 18rpx 52rpx rgba(0, 0, 0, 0.34);
+}
+
+/* 生成图片AI标识角标 */
+.result-ai-badge {
+  position: absolute;
+  top: 20rpx;
+  right: 20rpx;
+  padding: 8rpx 18rpx;
+  border-radius: 10rpx;
+  background: linear-gradient(135deg, rgba(196, 30, 58, 0.95), rgba(230, 168, 23, 0.95));
+  color: #fff7e6;
+  font-size: 22rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  box-shadow: 0 4rpx 16rpx rgba(196, 30, 58, 0.45);
 }
 
 .action-row {

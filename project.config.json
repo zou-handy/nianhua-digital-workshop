@@ -3,248 +3,272 @@
   "packOptions": {
     "ignore": [
       {
-        "type": "file",
-        "value": "images/nianhua-demo.jpg"
+        "value": "ip图片（六张未裁剪）.jpg",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "拳刀.png"
+        "value": "images/nianhua-demo.jpg",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "弯凿刀.jpg"
+        "value": "拳刀.png",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "三角刀.jpg"
+        "value": "弯凿刀.jpg",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "清底刀（刮刀）.jpg"
+        "value": "三角刀.jpg",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "棕刷（棕榈树）.jpg"
+        "value": "清底刀（刮刀）.jpg",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "梨木板和椴木板.jpg"
+        "value": "棕刷（棕榈树）.jpg",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "新图，全彩，一个将军.jpg"
+        "value": "梨木板和椴木板.jpg",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "新图的黑色线稿.jpg"
+        "value": "新图，全彩，一个将军.jpg",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "新图的黑色木板.png"
+        "value": "新图的黑色线稿.jpg",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "新图的红色.jpg"
+        "value": "新图的黑色木板.png",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "新图的红色木板.png"
+        "value": "新图的红色.jpg",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "新图的黄色.jpg"
+        "value": "新图的红色木板.png",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "新图的黄色木板.png"
+        "value": "新图的黄色.jpg",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "新图的绿色.jpg"
+        "value": "新图的黄色木板.png",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "新图的绿色木板.png"
+        "value": "新图的绿色.jpg",
+        "type": "file"
       },
       {
-        "type": "folder",
-        "value": "node_modules"
+        "value": "新图的绿色木板.png",
+        "type": "file"
       },
       {
-        "type": "folder",
-        "value": "public"
+        "value": "node_modules",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": "api"
+        "value": "miniprogram_npm",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": "miniprogram_npm/three-platformize"
+        "value": "outputs",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": "miniprogram_npm/threejs-miniprogram"
+        "value": "seed3d-service",
+        "type": "folder"
       },
       {
-        "type": "file",
-        "value": "pages/model3d-viewer/vendor/three-platformize/index.js"
+        "value": "docs",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": "cloudfunctions"
+        "value": ".env.local",
+        "type": "file"
       },
       {
-        "type": "folder",
-        "value": "rules"
+        "value": "public",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": "codebuddy-plugin"
+        "value": "api",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": "scripts"
+        "value": "miniprogram_npm/three-platformize",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": "components/layer-stack"
+        "value": "miniprogram_npm/threejs-miniprogram",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": "pages/knowledge"
+        "value": "cloudfunctions",
+        "type": "folder"
       },
       {
-        "type": "file",
-        "value": "utils/saveLayerImage.js"
+        "value": "rules",
+        "type": "folder"
       },
       {
-        "type": "file",
-        "value": "utils/splitColors.js"
+        "value": "codebuddy-plugin",
+        "type": "folder"
       },
       {
-        "type": "file",
-        "value": "utils/api.js"
+        "value": "scripts",
+        "type": "folder"
       },
       {
-        "type": "file",
-        "value": "utils/gl-renderer.js"
+        "value": "components/layer-stack",
+        "type": "folder"
       },
       {
-        "type": "file",
-        "value": "utils/apiBaseURL.js"
+        "value": "pages/knowledge",
+        "type": "folder"
       },
       {
-        "type": "file",
-        "value": "utils/util.js"
+        "value": "utils/saveLayerImage.js",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "images/README.md"
+        "value": "utils/splitColors.js",
+        "type": "file"
       },
       {
-        "type": "folder",
-        "value": ".agent"
+        "value": "utils/api.js",
+        "type": "file"
       },
       {
-        "type": "folder",
-        "value": ".claude"
+        "value": "utils/gl-renderer.js",
+        "type": "file"
       },
       {
-        "type": "folder",
-        "value": ".clinerules"
+        "value": "utils/apiBaseURL.js",
+        "type": "file"
       },
       {
-        "type": "folder",
-        "value": ".codebuddy"
+        "value": "utils/util.js",
+        "type": "file"
       },
       {
-        "type": "folder",
-        "value": ".codex"
+        "value": "images/README.md",
+        "type": "file"
       },
       {
-        "type": "folder",
-        "value": ".comate"
+        "value": ".agent",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": ".cursor"
+        "value": ".agents",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": ".gemini"
+        "value": ".claude",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": ".github"
+        "value": ".clinerules",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": ".iflow"
+        "value": ".codebuddy",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": ".kiro"
+        "value": ".codex",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": ".lingma"
+        "value": ".comate",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": ".qoder"
+        "value": ".cursor",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": ".qwen"
+        "value": ".gemini",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": ".roo"
+        "value": ".github",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": ".rules"
+        "value": ".iflow",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": ".trae"
+        "value": ".kiro",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": ".vscode"
+        "value": ".lingma",
+        "type": "folder"
       },
       {
-        "type": "folder",
-        "value": ".windsurf"
+        "value": ".qoder",
+        "type": "folder"
       },
       {
-        "type": "file",
-        "value": "CODEBUDDY.md"
+        "value": ".qwen",
+        "type": "folder"
       },
       {
-        "type": "file",
-        "value": "README.md"
+        "value": ".roo",
+        "type": "folder"
       },
       {
-        "type": "file",
-        "value": "package.json"
+        "value": ".rules",
+        "type": "folder"
       },
       {
-        "type": "file",
-        "value": "package-lock.json"
+        "value": ".trae",
+        "type": "folder"
       },
       {
-        "type": "file",
-        "value": ".mcp.json"
+        "value": ".vscode",
+        "type": "folder"
+      },
+      {
+        "value": ".windsurf",
+        "type": "folder"
+      },
+      {
+        "value": "CODEBUDDY.md",
+        "type": "file"
+      },
+      {
+        "value": "README.md",
+        "type": "file"
+      },
+      {
+        "value": "package.json",
+        "type": "file"
+      },
+      {
+        "value": "package-lock.json",
+        "type": "file"
+      },
+      {
+        "value": ".mcp.json",
+        "type": "file"
       }
     ],
     "include": []
   },
   "setting": {
     "urlCheck": false,
-    "es6": false,
-    "enhance": false,
+    "es6": true,
+    "enhance": true,
     "postcss": true,
     "preloadBackgroundData": false,
     "minified": true,
@@ -285,8 +309,8 @@
     "disableSWC": true
   },
   "compileType": "miniprogram",
-  "libVersion": "2.33.0",
-  "appid": "touristappid",
+  "libVersion": "2.31.1",
+  "appid": "wxa2eb9bd274d2af5e",
   "projectname": "foshan-nianhua",
   "condition": {},
   "editorSetting": {

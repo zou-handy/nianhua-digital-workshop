@@ -5,6 +5,8 @@
   "description": "佛山木版年画 AI 创作微信小程序与后端分色服务",
   "type": "commonjs",
   "dependencies": {
+    "@babel/runtime": "^8.0.0",
+    "@cloudbase/agent-ui-miniprogram": "^0.0.24",
     "sharp": "^0.34.5",
     "three-platformize": "^1.133.3"
   }

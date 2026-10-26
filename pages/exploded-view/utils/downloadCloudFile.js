@@ -1,16 +1,15 @@
 const { resolveCloudURL } = require('./resolveCloudURL');
+const { getPersistentResource } = require('../../../utils/persistentResourceCache');
 
 function downloadCloudFile(fileID) {
   if (!fileID || !fileID.startsWith('cloud://')) {
     return Promise.reject(new Error('invalid cloud fileID'));
   }
 
-  return new Promise((resolve, reject) => {
-    wx.cloud.downloadFile({
-      fileID,
-      success: (res) => resolve(res.tempFilePath),
-      fail: reject
-    });
+  const fileName = fileID.split('/').pop() || '';
+  const extensionMatch = fileName.match(/\.([a-zA-Z0-9]+)$/);
+  return getPersistentResource(fileID, {
+    extension: extensionMatch ? extensionMatch[1] : 'png'
   });
 }
 

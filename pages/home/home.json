@@ -1,4 +1,7 @@
 {
   "navigationStyle": "custom",
-  "backgroundColor": "#000000"
+  "backgroundColor": "#000000",
+  "usingComponents": {
+    "ai-float": "/components/ai-float/ai-float"
+  }
 }

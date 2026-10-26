@@ -562,8 +562,12 @@ var $TextDecoder = class {
 };
 
 // node_modules/three-platformize/src/WechatPlatform/index.js
-function OffscreenCanvas() {
-  return wx.createOffscreenCanvas();
+function OffscreenCanvas(width = 1, height = 1) {
+  return wx.createOffscreenCanvas({
+    type: "2d",
+    width,
+    height
+  });
 }
 var WechatPlatform = class {
   constructor(canvas, width, height) {
@@ -575,7 +579,7 @@ var WechatPlatform = class {
     this.document = {
       createElementNS(_, type) {
         if (type === "canvas")
-          return canvas;
+          return new OffscreenCanvas(1, 1);
         if (type === "img")
           return canvas.createImage();
       }

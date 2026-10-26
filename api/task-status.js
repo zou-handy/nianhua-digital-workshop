@@ -74,8 +74,7 @@ export default async function handler(req, res) {
       }
       if (fileUrl) {
         taskStatus.fileUrl = fileUrl
-        const urlPath = fileUrl.split('?')[0]
-        taskStatus.fileFormat = urlPath.endsWith('.zip') ? 'zip' : 'glb'
+        taskStatus.fileFormat = 'zip'
       }
       taskStatus._debug = result.content
     }
@@ -88,8 +87,7 @@ export default async function handler(req, res) {
         taskStatus.modelUrl = result.output.url
       } else if (result.output.file_url) {
         taskStatus.fileUrl = result.output.file_url
-        const urlPath = result.output.file_url.split('?')[0]
-        taskStatus.fileFormat = urlPath.endsWith('.zip') ? 'zip' : 'glb'
+        taskStatus.fileFormat = 'zip'
       }
       taskStatus._debug = result.output
     }

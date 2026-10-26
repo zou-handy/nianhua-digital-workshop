@@ -20,7 +20,13 @@
   <view class="grid">
     <view class="card" wx:for="{{models}}" wx:key="id" bindtap="onModelTap" data-item="{{item}}">
       <view class="card-icon" style="background-color: {{item.color}};">
-        <text class="emoji">{{item.emoji}}</text>
+        <image
+          wx:if="{{item.thumbnailPath}}"
+          class="card-thumbnail"
+          src="{{item.thumbnailPath}}"
+          mode="aspectFill"
+        ></image>
+        <text wx:else class="emoji">{{item.emoji}}</text>
       </view>
       <text class="card-name">{{item.name}}</text>
     </view>

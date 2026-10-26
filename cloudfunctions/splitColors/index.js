@@ -2,6 +2,8 @@ const tcb = require('@cloudbase/node-sdk');
 const { PNG } = require('pngjs');
 const jpeg = require('jpeg-js');
 
+const DEFAULT_MAX_COLORS = 5;
+
 exports.main = async (event = {}) => {
   const app = tcb.init({ env: tcb.SYMBOL_CURRENT_ENV });
 
@@ -9,7 +11,10 @@ exports.main = async (event = {}) => {
     const imageUrl = event.imageUrl || event.imageBase64 || event.image;
     const removeBackground = event.removeBackground !== false;
     const shouldReturnBase64 = event.returnBase64 === true;
+    const flattenPalette = event.flattenPalette === true;
     const maxColors = normalizeMaxColors(event.maxColors || event.colorCount);
+    const requestedPalette = normalizePalette(event.palette);
+    const paletteLabels = normalizePaletteLabels(event.paletteLabels);
     const outputPrefix = normalizeOutputPrefix(event.outputPrefix);
     const maxDimension = normalizeMaxDimension(event.maxDimension || 1400);
 
@@ -36,19 +41,14 @@ exports.main = async (event = {}) => {
     }
 
     const mainColors = detectMainColors(rawPixels, width, height);
-    const selectedColors = maxColors > 0 ? mainColors.slice(0, maxColors) : mainColors;
+    const selectedColors = requestedPalette.length
+      ? requestedPalette
+      : mainColors.slice(0, maxColors > 0 ? maxColors : DEFAULT_MAX_COLORS);
 
     if (selectedColors.length < 2) {
       return {
         success: false,
         error: '图片颜色太少，无法进行有效分色。请选择色彩更丰富的图片。'
-      };
-    }
-
-    if (mainColors.length > 12 && maxColors <= 0) {
-      return {
-        success: false,
-        error: '图片颜色过于复杂（检测到' + mainColors.length + '种主色），不适合进行传统套印分色。请选择色块分明的图片。'
       };
     }
 
@@ -88,9 +88,9 @@ exports.main = async (event = {}) => {
       for (let i = 0; i < width * height; i++) {
         const offset = i * 4;
         if (pixelAssignment[i] === layerIndex) {
-          layerPng.data[offset] = rawPixels[offset];
-          layerPng.data[offset + 1] = rawPixels[offset + 1];
-          layerPng.data[offset + 2] = rawPixels[offset + 2];
+          layerPng.data[offset] = flattenPalette ? mainColor.r : rawPixels[offset];
+          layerPng.data[offset + 1] = flattenPalette ? mainColor.g : rawPixels[offset + 1];
+          layerPng.data[offset + 2] = flattenPalette ? mainColor.b : rawPixels[offset + 2];
           layerPng.data[offset + 3] = 255;
           pixelCount++;
         } else {
@@ -108,7 +108,7 @@ exports.main = async (event = {}) => {
       });
       const layerResult = {
         name: 'color_' + (layerIndex + 1),
-        label: getColorLabel(mainColor.r, mainColor.g, mainColor.b, layerIndex),
+        label: paletteLabels[layerIndex] || getColorLabel(mainColor.r, mainColor.g, mainColor.b, layerIndex),
         color: rgbToHex(mainColor.r, mainColor.g, mainColor.b),
         pixelCount,
         fileID: uploadResult.fileID || ''
@@ -121,12 +121,32 @@ exports.main = async (event = {}) => {
       results.push(layerResult);
     }
 
+    let quantizedFileID = '';
+    if (flattenPalette) {
+      const quantized = new PNG({ width, height });
+      for (let i = 0; i < width * height; i++) {
+        const offset = i * 4;
+        const layerIndex = pixelAssignment[i];
+        const color = layerIndex >= 0 ? selectedColors[layerIndex] : null;
+        quantized.data[offset] = color ? color.r : 255;
+        quantized.data[offset + 1] = color ? color.g : 255;
+        quantized.data[offset + 2] = color ? color.b : 255;
+        quantized.data[offset + 3] = 255;
+      }
+      const quantizedUpload = await app.uploadFile({
+        cloudPath: (outputPrefix || ('split-layers/' + jobId)) + '/quantized-original.png',
+        fileContent: PNG.sync.write(quantized)
+      });
+      quantizedFileID = quantizedUpload.fileID || '';
+    }
+
     return {
       success: true,
       width,
       height,
       storagePrefix: outputPrefix || ('split-layers/' + jobId + '/'),
       colorCount: selectedColors.length,
+      quantizedFileID,
       layers: results
     };
   } catch (err) {
@@ -153,6 +173,26 @@ function normalizeMaxColors(value) {
   const count = parseInt(value, 10);
   if (!Number.isFinite(count) || count <= 0) return 0;
   return Math.max(2, Math.min(count, 12));
+}
+
+function normalizePalette(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 12).map((color) => {
+    const match = String(color || '').trim().match(/^#?([0-9a-f]{6})$/i);
+    if (!match) return null;
+    const hex = match[1];
+    return {
+      r: parseInt(hex.slice(0, 2), 16),
+      g: parseInt(hex.slice(2, 4), 16),
+      b: parseInt(hex.slice(4, 6), 16),
+      count: 0
+    };
+  }).filter(Boolean);
+}
+
+function normalizePaletteLabels(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 12).map((label) => String(label || '').trim().slice(0, 16));
 }
 
 function normalizeMaxDimension(value) {
@@ -301,7 +341,7 @@ function mergeCloseColors(colors) {
       if (used.has(j)) continue;
 
       if (shouldMerge(current, colors[j])) {
-        current.count += colors[j].count;
+        current = mergeColorPair(current, colors[j]);
         used.add(j);
       }
     }
@@ -316,24 +356,55 @@ function shouldMerge(colorA, colorB) {
   const [hA, sA, lA] = rgbToHsl(colorA.r, colorA.g, colorA.b);
   const [hB, sB, lB] = rgbToHsl(colorB.r, colorB.g, colorB.b);
 
-  if (sA < 0.15 && sB < 0.15) {
-    return Math.abs(lA - lB) < 0.2;
-  }
+  const perceptualDistance = deltaE76(rgbToLab(colorA.r, colorA.g, colorA.b), rgbToLab(colorB.r, colorB.g, colorB.b));
+  if (perceptualDistance <= 22) return true;
 
-  if ((sA < 0.15) !== (sB < 0.15)) {
-    return false;
-  }
+  if (lA < 0.3 && lB < 0.3 && perceptualDistance <= 30) return true;
+
+  if (sA < 0.15 && sB < 0.15) return Math.abs(lA - lB) < 0.24;
+  if ((sA < 0.15) !== (sB < 0.15)) return false;
 
   let hDiff = Math.abs(hA - hB);
   if (hDiff > 180) hDiff = 360 - hDiff;
 
-  if (hDiff > 25) return false;
+  const bothCool = hA >= 80 && hA <= 240 && hB >= 80 && hB <= 240;
+  if (hDiff > (bothCool ? 42 : 28)) return false;
 
   if (Math.abs(lA - lB) > 0.25) return false;
 
   if (Math.abs(sA - sB) > 0.35) return false;
 
   return true;
+}
+
+function mergeColorPair(colorA, colorB) {
+  const total = colorA.count + colorB.count;
+  return {
+    r: Math.round((colorA.r * colorA.count + colorB.r * colorB.count) / total),
+    g: Math.round((colorA.g * colorA.count + colorB.g * colorB.count) / total),
+    b: Math.round((colorA.b * colorA.count + colorB.b * colorB.count) / total),
+    count: total
+  };
+}
+
+function rgbToLab(r, g, b) {
+  const linear = [r, g, b].map((value) => {
+    const channel = value / 255;
+    return channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+  });
+  const x = (linear[0] * 0.4124 + linear[1] * 0.3576 + linear[2] * 0.1805) / 0.95047;
+  const y = linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+  const z = (linear[0] * 0.0193 + linear[1] * 0.1192 + linear[2] * 0.9505) / 1.08883;
+  const pivot = (value) => value > 0.008856 ? Math.cbrt(value) : (7.787 * value) + (16 / 116);
+  const fx = pivot(x), fy = pivot(y), fz = pivot(z);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+
+function deltaE76(labA, labB) {
+  const dl = labA[0] - labB[0];
+  const da = labA[1] - labB[1];
+  const db = labA[2] - labB[2];
+  return Math.sqrt(dl * dl + da * da + db * db);
 }
 
 function hslToRgb(h, s, l) {
@@ -367,14 +438,29 @@ function rgbToHex(r, g, b) {
   return '#' + [r, g, b].map((value) => value.toString(16).padStart(2, '0')).join('').toUpperCase();
 }
 
-function getColorLabel(r, g, b, index) {
+function getColorLabel(r, g, b) {
   const [h, s, l] = rgbToHsl(r, g, b);
-  if (l < 0.22) return '墨版';
-  if ((h < 30 || h >= 330) && s > 0.25) return '红版';
-  if (h >= 30 && h < 80 && s > 0.2) return '黄版';
-  if (h >= 80 && h <= 180 && s > 0.18) return '绿版';
-  if (h > 180 && h < 260 && s > 0.18) return '青版';
-  return '色版' + (index + 1);
+  if (s < 0.14) {
+    if (l < 0.2) return '墨黑色版';
+    if (l < 0.42) return '深灰色版';
+    if (l < 0.72) return '中灰色版';
+    return '浅灰色版';
+  }
+
+  if (h < 15 || h >= 345) {
+    if (l >= 0.7) return '粉红色版';
+    if (l < 0.36) return '深红色版';
+    return s >= 0.62 ? '朱红色版' : '暗红色版';
+  }
+  if (h < 45) return l < 0.38 ? '棕红色版' : '橙红色版';
+  if (h < 75) return l >= 0.7 ? '浅黄色版' : (l < 0.38 ? '深黄色版' : '金黄色版');
+  if (h < 105) return '黄绿色版';
+  if (h < 165) return l < 0.36 ? '深绿色版' : '翠绿色版';
+  if (h < 205) return l < 0.36 ? '深青色版' : '青绿色版';
+  if (h < 245) return l < 0.36 ? '深蓝色版' : '青蓝色版';
+  if (h < 285) return '蓝紫色版';
+  if (h < 330) return l >= 0.68 ? '粉紫色版' : '紫红色版';
+  return '玫红色版';
 }
 
 function removeConnectedBackground(rawPixels, width, height) {

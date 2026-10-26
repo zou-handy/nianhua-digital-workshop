@@ -1,0 +1,102 @@
+<view class="chat-page">
+  <!-- 顶部导航 -->
+  <view class="chat-header">
+    <view class="chat-back" bindtap="goBack">
+      <text class="chat-back-icon">←</text>
+    </view>
+    <view class="chat-avatar-wrap" bindtap="switchAvatar">
+      <image class="chat-avatar" src="{{avatarUrl}}" mode="aspectFill"></image>
+      <view class="avatar-switch-badge">↻</view>
+    </view>
+    <view class="chat-title-wrap">
+      <view class="chat-title-row">
+        <text class="chat-title">小年</text>
+        <view class="ai-tag">AI生成</view>
+      </view>
+      <text class="chat-status">{{isRunning ? '正在思考...' : '佛山年画传承助手'}}</text>
+    </view>
+  </view>
+
+  <!-- AI生成内容显著标识 -->
+  <view class="ai-notice-bar">
+    <text class="ai-notice-text">本页内容由人工智能（AI）生成，仅供参考</text>
+  </view>
+
+  <!-- 消息列表 -->
+  <scroll-view
+    class="chat-messages"
+    scroll-y
+    scroll-into-view="{{scrollToId}}"
+    scroll-with-animation
+    enhanced
+    show-scrollbar="{{false}}"
+  >
+    <view class="chat-welcome" wx:if="{{messages.length === 0}}">
+      <view class="chat-welcome-icon">🏮</view>
+      <text class="chat-welcome-title">你好，我是小年</text>
+      <text class="chat-welcome-desc">{{capabilityText}}</text>
+      <view class="chat-suggestions">
+        <view class="chat-suggestion" bindtap="sendSuggestion" data-text="佛山年画有什么特色？">
+          <text>佛山年画有什么特色？</text>
+        </view>
+        <view class="chat-suggestion" bindtap="sendSuggestion" data-text="打开3D模型展厅">
+          <text>打开3D模型展厅</text>
+        </view>
+        <view class="chat-suggestion" bindtap="sendSuggestion" data-text="打开AI图生3D">
+          <text>打开AI图生3D</text>
+        </view>
+        <view class="chat-suggestion" bindtap="sendSuggestion" data-text="打开年画分色套印体验">
+          <text>打开年画分色套印体验</text>
+        </view>
+      </view>
+    </view>
+
+    <view
+      wx:for="{{messages}}"
+      wx:key="id"
+      id="msg-{{item.id}}"
+      class="msg-row {{item.role === 'user' ? 'msg-user' : 'msg-assistant'}}"
+    >
+      <image
+        wx:if="{{item.role === 'assistant'}}"
+        class="msg-avatar"
+        src="{{avatarUrl}}"
+        mode="aspectFill"
+      ></image>
+      <view class="msg-bubble {{item.role === 'user' ? 'bubble-user' : 'bubble-assistant'}}">
+        <text class="msg-text" user-select>{{item.content}}</text>
+      </view>
+      <view wx:if="{{item.role === 'assistant'}}" class="msg-ai-label">AI生成</view>
+    </view>
+
+    <view wx:if="{{isRunning && messages.length > 0}}" class="msg-row msg-assistant">
+      <image class="msg-avatar" src="{{avatarUrl}}" mode="aspectFill"></image>
+      <view class="msg-bubble bubble-assistant">
+        <view class="typing-indicator">
+          <view class="typing-dot"></view>
+          <view class="typing-dot"></view>
+          <view class="typing-dot"></view>
+        </view>
+      </view>
+    </view>
+
+    <view class="chat-bottom-spacer"></view>
+  </scroll-view>
+
+  <!-- 输入区 -->
+  <view class="chat-input-area">
+    <input
+      class="chat-input"
+      placeholder="问小年关于年画的问题..."
+      placeholder-class="chat-input-placeholder"
+      value="{{inputText}}"
+      bindinput="onInput"
+      bindconfirm="sendMessage"
+      confirm-type="send"
+      adjust-position
+    />
+    <view class="chat-send-btn {{inputText ? 'send-active' : ''}}" bindtap="sendMessage">
+      <text class="chat-send-icon">↑</text>
+    </view>
+  </view>
+</view>

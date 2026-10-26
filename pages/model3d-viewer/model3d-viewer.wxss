@@ -45,11 +45,83 @@ page {
   z-index: 100;
 }
 
+.model-name-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
 .model-name-text {
   color: #F8E5A9;
   font-size: 30rpx;
   font-weight: bold;
   letter-spacing: 2rpx;
+}
+
+/* 模型AI生成标识小徽章 */
+.model-ai-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  background: linear-gradient(135deg, rgba(196, 30, 58, 0.9), rgba(230, 168, 23, 0.9));
+  color: #fff7e6;
+  font-size: 18rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+}
+
+/* 顶部AI生成内容显著标识 */
+.ai-generated-badge {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 40rpx);
+  right: 30rpx;
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8rpx;
+  pointer-events: none;
+}
+
+.ai-generated-tag {
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+  background: linear-gradient(135deg, rgba(196, 30, 58, 0.95), rgba(230, 168, 23, 0.95));
+  color: #fff7e6;
+  font-size: 22rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  box-shadow: 0 4rpx 16rpx rgba(196, 30, 58, 0.4);
+}
+
+.ai-generated-text {
+  font-size: 20rpx;
+  color: rgba(248, 229, 169, 0.9);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 4rpx 14rpx;
+  border-radius: 6rpx;
+  letter-spacing: 1rpx;
+}
+
+.procedural-generated-badge {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 40rpx);
+  right: 30rpx;
+  z-index: 150;
+  pointer-events: none;
+}
+
+.procedural-generated-tag,
+.model-procedural-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 5rpx 14rpx;
+  color: #fff7e6;
+  font-size: 19rpx;
+  background: rgba(111, 67, 37, 0.9);
+  border: 1rpx solid rgba(215, 165, 61, 0.55);
+  border-radius: 4rpx;
 }
 
 /* 底部提示 */

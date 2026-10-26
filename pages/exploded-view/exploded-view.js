@@ -1,13 +1,50 @@
 const USER_CACHE_KEY = 'userColorLayers';
-const PRESET_CACHE_KEY = 'presetColorLayersCloudV1';
-const { layerFileID } = require('../../constants/cloudAssets');
-const { downloadCloudFile } = require('./utils/downloadCloudFile');
+const PRESET_CACHE_KEY = 'presetColorLayersCloudV2';
+const { layerFileID, ADVANCED_PRINT_IMAGES, ADVANCED_PRINT_SETS } = require('../../constants/cloudAssets');
 const { requestSplitColors } = require('./utils/splitColors');
 const { saveLayerImage } = require('./utils/saveLayerImage');
+const { downloadFileToTemp } = require('./utils/downloadCloudFile');
+const { buildShareAppMessage } = require('../../utils/shareConfig');
 
 const MAX_USER_RECORDS = 10;
 
 const PRESET_GALLERIES = [
+  {
+    id: 'advanced-print',
+    title: '卷五作品一 · 四色成画',
+    isPreset: true,
+    layerCount: 4,
+    layerFileIDs: [
+      ADVANCED_PRINT_IMAGES.backendLayer3,
+      ADVANCED_PRINT_IMAGES.backendLayer0,
+      ADVANCED_PRINT_IMAGES.backendLayer1,
+      ADVANCED_PRINT_IMAGES.backendLayer2
+    ],
+    layerMeta: [
+      { color: '#1A1A1A', label: '墨线版' },
+      { color: '#D42F2F', label: '万年红' },
+      { color: '#F2C94C', label: '石黄版' },
+      { color: '#5396AC', label: '青绿版' }
+    ]
+  },
+  {
+    id: 'advanced-print-set-2',
+    title: '卷五作品二 · 四色成画',
+    isPreset: true,
+    layerCount: 4,
+    layerFileIDs: [
+      ADVANCED_PRINT_SETS[1].layers.black,
+      ADVANCED_PRINT_SETS[1].layers.red,
+      ADVANCED_PRINT_SETS[1].layers.yellow,
+      ADVANCED_PRINT_SETS[1].layers.green
+    ],
+    layerMeta: [
+      { color: '#1A1A1A', label: '墨线版' },
+      { color: '#D42F2F', label: '万年红' },
+      { color: '#F2C94C', label: '石黄版' },
+      { color: '#5396AC', label: '青绿版' }
+    ]
+  },
   {
     id: 'nianhua-demo',
     title: '佛山木版年画示例',
@@ -36,10 +73,59 @@ const DEFAULT_ROTATE_X = 55;
 const DEFAULT_ROTATE_Z = -30;
 const DEFAULT_SCALE = 1;
 
+function getPreciseLayerLabel(color, fallback) {
+  const match = String(color || '').match(/^#?([0-9a-f]{6})$/i);
+  if (!match) return fallback || '未命名色版';
+  const hex = match[1];
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  const [h, s, l] = rgbToHslForLabel(r, g, b);
+
+  if (s < 0.14) {
+    if (l < 0.2) return '墨黑色版';
+    if (l < 0.42) return '深灰色版';
+    if (l < 0.72) return '中灰色版';
+    return '浅灰色版';
+  }
+  if (h < 15 || h >= 345) {
+    if (l >= 0.7) return '粉红色版';
+    if (l < 0.36) return '深红色版';
+    return s >= 0.62 ? '朱红色版' : '暗红色版';
+  }
+  if (h < 45) return l < 0.38 ? '棕红色版' : '橙红色版';
+  if (h < 75) return l >= 0.7 ? '浅黄色版' : (l < 0.38 ? '深黄色版' : '金黄色版');
+  if (h < 105) return '黄绿色版';
+  if (h < 165) return l < 0.36 ? '深绿色版' : '翠绿色版';
+  if (h < 205) return l < 0.36 ? '深青色版' : '青绿色版';
+  if (h < 245) return l < 0.36 ? '深蓝色版' : '青蓝色版';
+  if (h < 285) return '蓝紫色版';
+  if (h < 330) return l >= 0.68 ? '粉紫色版' : '紫红色版';
+  return '玫红色版';
+}
+
+function rgbToHslForLabel(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const delta = max - min;
+    s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+    if (max === r) h = ((g - b) / delta + (g < b ? 6 : 0)) * 60;
+    else if (max === g) h = ((b - r) / delta + 2) * 60;
+    else h = ((r - g) / delta + 4) * 60;
+  }
+  return [h, s, l];
+}
+
 Page({
+  onShareAppMessage: buildShareAppMessage,
+
   data: {
     loading: false,
-    loadingText: '正在分析色层...',
+    loadingText: '正在加载分色展厅',
     loadingProgress: '',
 
     // 视图状态
@@ -47,6 +133,8 @@ Page({
     scale: DEFAULT_SCALE,
     rotateX: DEFAULT_ROTATE_X,
     rotateZ: DEFAULT_ROTATE_Z,
+    isAdvancedPreset: false,
+    displayMode: 'axis',
 
     // 图层可见性：索引 -> true/false
     layerVisibility: {},
@@ -70,18 +158,33 @@ Page({
 
     this._isSwitching = false;
     this._doubleTapTimer = null;
+    this._lastStageTapAt = 0;
+    this._printSequenceTimer = null;
+    this._longPressActive = false;
+    this._suppressNextStageTap = false;
 
+    const isAdvancedPreset = String(options.preset || '').indexOf('advanced-print') === 0;
     this.setData({
       loading: true,
-      loadingProgress: '准备预置图层'
+      loadingText: isAdvancedPreset ? '正在展开四色成画' : '正在加载分色展厅',
+      loadingProgress: '正在准备分色图层',
+      isAdvancedPreset,
+      rotateX: isAdvancedPreset ? 0 : DEFAULT_ROTATE_X,
+      rotateZ: isAdvancedPreset ? 0 : DEFAULT_ROTATE_Z,
+      scale: DEFAULT_SCALE
     });
 
     try {
-      const presetGalleries = await this._getPresetGalleries();
-      const userGalleries = this._getValidUserGalleries();
+      const presetGalleries = await this._getPresetGalleries(options.preset);
+      const userGalleries = options.preset
+        ? []
+        : await this._localizeGalleries(this._getValidUserGalleries());
       const colorLayersList = [...presetGalleries, ...userGalleries];
+      const requestedPresetIndex = presetGalleries.findIndex((item) => item.id === options.preset);
       const shouldShowLatestUser = options.showLatestUser === 'true' && userGalleries.length > 0;
-      const currentIndex = shouldShowLatestUser ? presetGalleries.length : 0;
+      const currentIndex = requestedPresetIndex >= 0
+        ? requestedPresetIndex
+        : (shouldShowLatestUser ? presetGalleries.length : 0);
 
       this.setData({
         colorLayersList,
@@ -91,6 +194,12 @@ Page({
       }, () => {
         if (colorLayersList.length > 0) {
           this.applyCurrentLayers();
+          this._startGuideTimer = setTimeout(() => {
+            const aiFloat = this.selectComponent('#aiFloat');
+            if (!aiFloat) return;
+            aiFloat.setPageContext({ chapter: '2D分色展厅' });
+            aiFloat.startTwoDInteractionGuide();
+          }, 500);
         }
       });
     } catch (err) {
@@ -98,6 +207,11 @@ Page({
       this.setData({ loading: false, loadingProgress: '' });
       wx.showToast({ title: '图层加载失败，请重试', icon: 'none' });
     }
+  },
+
+  onUnload() {
+    clearTimeout(this._startGuideTimer);
+    this._clearInteractionTimers();
   },
 
   // ── 导航 ──
@@ -120,11 +234,52 @@ Page({
     wx.vibrateShort({ type: 'light' });
   },
 
+  /** 单击展开/重合，双击切换轴向与扇形布局。 */
+  onStageTap() {
+    if (this._suppressNextStageTap) {
+      this._suppressNextStageTap = false;
+      return;
+    }
+    if (this._touchMoved) return;
+    const now = Date.now();
+    if (now - this._lastStageTapAt < 280) {
+      clearTimeout(this._doubleTapTimer);
+      this._doubleTapTimer = null;
+      this._lastStageTapAt = 0;
+      this.toggleLayoutMode();
+      return;
+    }
+
+    this._lastStageTapAt = now;
+    this._doubleTapTimer = setTimeout(() => {
+      this._doubleTapTimer = null;
+      this.toggleExplode();
+    }, 280);
+  },
+
+  toggleLayoutMode() {
+    const displayMode = this.data.displayMode === 'fan' ? 'axis' : 'fan';
+    this.setData({
+      displayMode,
+      isExploded: true
+    }, () => this.updateLayerStyles());
+    wx.vibrateShort({ type: 'medium' });
+  },
+
+  onStageLongPress() {
+    if (!this.data.layers.length) return;
+    this._longPressActive = true;
+    this._suppressNextStageTap = true;
+    this._touchMoved = true;
+    this._startPrintSequence();
+    wx.vibrateShort({ type: 'medium' });
+  },
+
   /** 重置视角 */
   resetView() {
     this.setData({
-      rotateX: DEFAULT_ROTATE_X,
-      rotateZ: DEFAULT_ROTATE_Z,
+      rotateX: this.data.isAdvancedPreset ? 0 : DEFAULT_ROTATE_X,
+      rotateZ: this.data.isAdvancedPreset ? 0 : DEFAULT_ROTATE_Z,
       scale: DEFAULT_SCALE
     });
     wx.vibrateShort({ type: 'light' });
@@ -162,12 +317,12 @@ Page({
   },
 
   updateLayerStyles() {
-    const { layers, isExploded, layerVisibility } = this.data;
+    const { layers, isExploded, layerVisibility, displayMode } = this.data;
     this.setData({
       layers: layers.map((layer, index) => ({
         ...layer,
         visible: layerVisibility[index] !== false,
-        layerStyle: this._getLayerStyle(index, isExploded)
+        layerStyle: this._getLayerStyle(index, isExploded, displayMode)
       }))
     });
   },
@@ -294,6 +449,10 @@ Page({
   },
 
   onTouchEnd() {
+    if (this._longPressActive) {
+      this._longPressActive = false;
+      this._stopPrintSequence();
+    }
     this._initialPinchDistance = 0;
     this._initialScale = this.data.scale;
   },
@@ -370,18 +529,19 @@ Page({
     }
   },
 
-  async _getPresetGalleries() {
+  async _getPresetGalleries(requestedPreset) {
     const cache = wx.getStorageSync(PRESET_CACHE_KEY) || {};
     const nextCache = { ...cache };
     const galleries = [];
 
-    for (const gallery of PRESET_GALLERIES) {
+    const galleriesToLoad = requestedPreset
+      ? PRESET_GALLERIES.filter((gallery) => gallery.id === requestedPreset)
+      : PRESET_GALLERIES;
+
+    for (const gallery of galleriesToLoad) {
       try {
-        let layers = this._getCachedPresetLayers(gallery, cache[gallery.id]);
-        if (layers.length !== gallery.layerCount) {
-          this.setData({ loadingProgress: '下载' + gallery.title });
-          layers = await this._downloadPresetLayers(gallery);
-        }
+        this.setData({ loadingProgress: '正在准备分色图层' });
+        const layers = await this._downloadPresetLayers(gallery);
         if (layers.length === gallery.layerCount) {
           nextCache[gallery.id] = {
             id: gallery.id,
@@ -412,7 +572,7 @@ Page({
 
   _getCachedPresetLayers(gallery, cachedGallery) {
     if (!cachedGallery || !Array.isArray(cachedGallery.layers)) {
-      const expectedLayers = this._buildPresetLayersFromLocalPaths(gallery);
+      const expectedLayers = this._buildPresetLayersFromCloudPaths(gallery);
       if (this._areLayerFilesValid(expectedLayers)) return expectedLayers;
       return [];
     }
@@ -423,50 +583,56 @@ Page({
       this._areLayerFilesValid(storedLayers)
     ) {
       return storedLayers.map((layer, index) => ({
-        tempPath: layer.tempPath,
+        tempPath: layer.fileID || layer.tempPath,
+        fileID: layer.fileID || (this._isCloudFilePath(layer.tempPath) ? layer.tempPath : ''),
         color: layer.color || (PRESET_LAYER_META[index] ? PRESET_LAYER_META[index].color : ''),
         label: layer.label || (PRESET_LAYER_META[index] ? PRESET_LAYER_META[index].label : '图层' + (index + 1))
       }));
     }
 
-    const expectedLayers = this._buildPresetLayersFromLocalPaths(gallery);
+    const expectedLayers = this._buildPresetLayersFromCloudPaths(gallery);
     if (this._areLayerFilesValid(expectedLayers)) return expectedLayers;
     return [];
   },
 
-  _buildPresetLayersFromLocalPaths(gallery) {
+  _buildPresetLayersFromCloudPaths(gallery) {
+    const meta = gallery.layerMeta || PRESET_LAYER_META;
     return Array.from({ length: gallery.layerCount }, (_, index) => ({
-      tempPath: `${wx.env.USER_DATA_PATH}/layer_${gallery.id}_${index}.png`,
-      color: PRESET_LAYER_META[index].color,
-      label: PRESET_LAYER_META[index].label
+      tempPath: gallery.layerFileIDs ? gallery.layerFileIDs[index] : layerFileID(gallery.cloudPrefix, index),
+      fileID: gallery.layerFileIDs ? gallery.layerFileIDs[index] : layerFileID(gallery.cloudPrefix, index),
+      color: meta[index].color,
+      label: meta[index].label
     }));
   },
 
   async _downloadPresetLayers(gallery) {
-    const layers = [];
-    for (let i = 0; i < gallery.layerCount; i++) {
-      try {
-        const tempPath = await this._downloadPresetLayer(gallery, i);
-        layers.push({
-          tempPath,
-          color: PRESET_LAYER_META[i].color,
-          label: PRESET_LAYER_META[i].label
-        });
-      } catch (err) {
-        console.error('[分色展厅] 预置图层下载失败:', gallery.id, i, err);
-      }
-    }
-    return layers.length === gallery.layerCount ? layers : [];
+    const layers = this._buildPresetLayersFromCloudPaths(gallery);
+    return Promise.all(layers.map(async (layer) => ({
+      ...layer,
+      tempPath: await downloadFileToTemp(layer.fileID)
+    })));
   },
 
-  async _downloadPresetLayer(gallery, index) {
-    const fileID = layerFileID(gallery.cloudPrefix, index);
-    const tempPath = await downloadCloudFile(fileID);
-    const fs = wx.getFileSystemManager();
-    const savePath = `${wx.env.USER_DATA_PATH}/layer_${gallery.id}_${index}.png`;
-    try { fs.unlinkSync(savePath); } catch (err) { /* 忽略 */ }
-    fs.saveFileSync(tempPath, savePath);
-    return savePath;
+  async _localizeGalleries(galleries) {
+    const localized = [];
+    for (const gallery of galleries) {
+      try {
+        const layers = await Promise.all(gallery.layers.map(async (layer) => {
+          const source = layer.fileID || layer.tempPath;
+          if (this._isCloudFilePath(source) || /^https?:\/\//i.test(source)) {
+            return {
+              ...layer,
+              tempPath: await downloadFileToTemp(source)
+            };
+          }
+          return layer;
+        }));
+        localized.push({ ...gallery, layers });
+      } catch (error) {
+        console.error('[分色展厅] 用户图层本地化失败:', gallery.id, error);
+      }
+    }
+    return localized;
   },
 
   _getValidUserGalleries() {
@@ -498,7 +664,7 @@ Page({
           tempPath: layer.fileID || layer.tempPath,
           fileID: layer.fileID || (this._isCloudFilePath(layer.tempPath) ? layer.tempPath : ''),
           color: layer.color,
-          label: layer.label
+          label: getPreciseLayerLabel(layer.color, layer.label)
         })),
         timestamp: record.timestamp
       }));
@@ -539,6 +705,7 @@ Page({
 
   _switchItem(newIndex, direction) {
     if (this._isSwitching) return;
+    this._stopPrintSequence();
     this._isSwitching = true;
 
     const outClass = direction === 'left' ? 'slide-out-left' : 'slide-out-right';
@@ -552,6 +719,7 @@ Page({
         rotateZ: DEFAULT_ROTATE_Z,
         scale: DEFAULT_SCALE,
         isExploded: false,
+        displayMode: 'axis',
         slideDirection: inClass
       }, () => {
         this.applyCurrentLayers();
@@ -567,12 +735,23 @@ Page({
     return requestSplitColors(imageBase64);
   },
 
-  _getLayerStyle(index, isExploded) {
+  _getLayerStyle(index, isExploded, displayMode) {
     if (!isExploded) {
       return 'transform: translateZ(0px) translateY(0px); z-index: ' + (10 - index) + ';';
     }
 
     const totalLayers = this.data.layers.length || 1;
+    const center = (totalLayers - 1) / 2;
+    const centeredIndex = index - center;
+
+    if (displayMode === 'fan') {
+      const xOffset = centeredIndex * Math.min(120, 390 / Math.max(totalLayers - 1, 1));
+      const yOffset = Math.abs(centeredIndex) * 18;
+      const rotation = centeredIndex * 7;
+      const transform = 'translateX(' + Math.round(xOffset) + 'px) translateY(' + Math.round(yOffset) + 'px) rotateZ(' + rotation.toFixed(1) + 'deg) translateZ(' + (index * 3) + 'px)';
+      return 'transform: ' + transform + '; z-index: ' + (20 + index) + ';';
+    }
+
     const maxZ = 200;
     const maxY = 80;
 
@@ -588,6 +767,44 @@ Page({
 
     const transform = 'translateZ(' + Math.round(zOffset) + 'px) translateY(' + Math.round(yOffset) + 'px)';
     return 'transform: ' + transform + '; z-index: ' + (10 - index) + ';';
+  },
+
+  _startPrintSequence() {
+    this._stopPrintSequence();
+    const visibility = {};
+    this.data.layers.forEach((_, index) => { visibility[index] = false; });
+    this.setData({ layerVisibility: visibility }, () => this.updateLayerStyles());
+
+    let index = 0;
+    const advance = () => {
+      if (!this._longPressActive || !this.data.layers.length) return;
+      const nextVisibility = { ...this.data.layerVisibility };
+      if (index >= this.data.layers.length) {
+        this.data.layers.forEach((_, layerIndex) => { nextVisibility[layerIndex] = false; });
+        index = 0;
+        this.setData({ layerVisibility: nextVisibility }, () => this.updateLayerStyles());
+        return;
+      }
+      nextVisibility[index] = true;
+      this.setData({ layerVisibility: nextVisibility }, () => this.updateLayerStyles());
+      index++;
+    };
+    this._printSequenceTimer = setInterval(advance, 560);
+  },
+
+  _stopPrintSequence() {
+    if (!this._printSequenceTimer) return;
+    clearInterval(this._printSequenceTimer);
+    this._printSequenceTimer = null;
+  },
+
+  _clearInteractionTimers() {
+    this._longPressActive = false;
+    this._stopPrintSequence();
+    if (this._doubleTapTimer) {
+      clearTimeout(this._doubleTapTimer);
+      this._doubleTapTimer = null;
+    }
   },
 
   _getTouchDistance(touchA, touchB) {

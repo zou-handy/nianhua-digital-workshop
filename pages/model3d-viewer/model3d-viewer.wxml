@@ -4,6 +4,15 @@
     <text class="float-back-icon">←</text>
   </view>
 
+  <!-- AI生成内容显著标识 -->
+  <view class="ai-generated-badge" wx:if="{{!isProcedural}}">
+    <view class="ai-generated-tag">AI生成</view>
+    <text class="ai-generated-text">本3D模型由人工智能（AI）生成</text>
+  </view>
+  <view class="procedural-generated-badge" wx:else>
+    <view class="procedural-generated-tag">程序木板</view>
+  </view>
+
   <!-- WebGL Canvas 全屏 -->
   <canvas
     type="webgl"
@@ -12,11 +21,16 @@
     bindtouchstart="onTouchStart"
     bindtouchmove="onTouchMove"
     bindtouchend="onTouchEnd"
+    bindtouchcancel="onTouchEnd"
   ></canvas>
 
   <!-- 底部模型名称 -->
   <view class="model-name-bar">
-    <text class="model-name-text">{{modelName}}</text>
+    <view class="model-name-row">
+      <text class="model-name-text">{{modelName}}</text>
+      <view wx:if="{{!isProcedural}}" class="model-ai-tag">AI生成</view>
+      <view wx:else class="model-procedural-tag">PNG轮廓</view>
+    </view>
   </view>
 
   <!-- 底部提示 -->
@@ -27,6 +41,8 @@
   <!-- 加载中 -->
   <view class="loading-mask" wx:if="{{loading}}">
     <view class="spinner"></view>
-    <text class="loading-text">模型加载中...</text>
+    <text class="loading-text">{{loadingText}}</text>
   </view>
+
+  <ai-float id="aiFloat"></ai-float>
 </view>
