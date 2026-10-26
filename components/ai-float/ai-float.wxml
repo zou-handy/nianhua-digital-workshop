@@ -1,14 +1,40 @@
 <!-- 悬浮AI助手 -->
 <view
+  wx:if="{{bubbleVisible && !chatOpen}}"
+  class="ai-proactive-bubble ai-proactive-{{bubbleSide}}"
+  style="left:{{bubbleLeft}}px;top:{{bubbleTop}}px;width:{{bubbleWidth}}px;"
+  catchtap="openFromBubble"
+>
+  <text class="ai-proactive-text">{{bubbleText}}</text>
+  <view class="ai-proactive-arrow"></view>
+</view>
+
+<!-- 首次使用聚光教程：四块遮罩只保留当前可操作目标 -->
+<view wx:if="{{tutorialOpen}}" class="ai-tutorial-overlay" catchtouchmove="noop">
+  <view class="ai-tutorial-mask" style="{{tutorialMaskTop}}" catchtap="nextSpotlightTutorial"></view>
+  <view class="ai-tutorial-mask" style="{{tutorialMaskLeft}}" catchtap="nextSpotlightTutorial"></view>
+  <view class="ai-tutorial-mask" style="{{tutorialMaskRight}}" catchtap="nextSpotlightTutorial"></view>
+  <view class="ai-tutorial-mask" style="{{tutorialMaskBottom}}" catchtap="nextSpotlightTutorial"></view>
+  <view class="ai-tutorial-card" style="{{tutorialCardStyle}}" catchtap="noop">
+    <text class="ai-tutorial-kicker">小年 · 新手引导</text>
+    <text class="ai-tutorial-title">{{tutorialTitle}}</text>
+    <text class="ai-tutorial-text">{{tutorialText}}</text>
+    <view class="ai-tutorial-actions">
+      <text class="ai-tutorial-skip" bindtap="skipSpotlightTutorial">跳过</text>
+      <view class="ai-tutorial-next" bindtap="nextSpotlightTutorial">下一步</view>
+    </view>
+  </view>
+</view>
+
+<view
   class="ai-float-btn {{isDragging ? 'dragging' : ''}} {{chatOpen ? 'hidden' : ''}}"
   style="left:{{btnX}}px;top:{{btnY}}px;"
-  bindtap="openChat"
   catchtouchstart="onTouchStart"
   catchtouchmove="onTouchMove"
   catchtouchend="onTouchEnd"
 >
   <view class="ai-float-inner">
-    <text class="ai-float-icon">年</text>
+    <image class="ai-float-avatar" src="{{avatarUrl}}" mode="aspectFill"></image>
     <view class="ai-float-pulse"></view>
   </view>
 </view>
@@ -18,11 +44,15 @@
   <view class="ai-chat-panel" catchtap="noop">
     <!-- 标题栏 -->
     <view class="ai-panel-header">
-      <view class="ai-panel-avatar">
-        <text class="ai-panel-avatar-text">年</text>
+      <view class="ai-panel-avatar" bindtap="switchAvatar">
+        <image class="ai-panel-avatar-image" src="{{avatarUrl}}" mode="aspectFill"></image>
+        <view class="ai-avatar-switch">↻</view>
       </view>
       <view class="ai-panel-title-wrap">
-        <text class="ai-panel-title">小年</text>
+        <view class="ai-panel-title-row">
+          <text class="ai-panel-title">小年</text>
+          <view class="ai-tag">AI生成</view>
+        </view>
         <text class="ai-panel-status">{{isRunning ? '思考中...' : '年画传承助手'}}</text>
       </view>
       <view class="ai-panel-close" bindtap="closeChat">
@@ -40,15 +70,25 @@
       show-scrollbar="{{false}}"
     >
       <view class="ai-welcome" wx:if="{{messages.length === 0}}">
-        <text class="ai-welcome-emoji">🏮</text>
+        <view class="ai-welcome-seal">新</view>
         <text class="ai-welcome-text">你好，我是小年</text>
         <text class="ai-welcome-desc">{{pageContext}}</text>
+        <text class="ai-welcome-desc">{{capabilityText}}</text>
+        <view class="ai-tutorial-entry" bindtap="startHomeTutorial">
+          <view class="ai-tutorial-mark">引</view>
+          <view class="ai-tutorial-copy">
+            <text class="ai-tutorial-title">首页新手导览</text>
+            <text class="ai-tutorial-desc">认识八卷内容，学习卷五套印与数字展厅操作</text>
+          </view>
+          <text class="ai-tutorial-arrow">›</text>
+        </view>
+        <view class="ai-welcome-notice">本助手回复内容由人工智能（AI）生成，仅供参考</view>
         <view class="ai-suggestions">
           <view class="ai-suggestion" bindtap="sendSuggestion" data-text="{{suggestion1}}">
-            <text>{{suggestion1}}</text>
+            <text class="ai-suggestion-text">{{suggestion1}}</text>
           </view>
           <view class="ai-suggestion" bindtap="sendSuggestion" data-text="{{suggestion2}}">
-            <text>{{suggestion2}}</text>
+            <text class="ai-suggestion-text">{{suggestion2}}</text>
           </view>
         </view>
       </view>
@@ -62,6 +102,7 @@
         <view class="ai-msg-bubble {{item.role === 'user' ? 'ai-bubble-user' : 'ai-bubble-bot'}}">
           <text class="ai-msg-text" user-select>{{item.content}}</text>
         </view>
+        <text wx:if="{{item.role === 'assistant'}}" class="ai-msg-label">AI生成</text>
       </view>
 
       <view wx:if="{{isRunning}}" class="ai-msg ai-msg-bot">

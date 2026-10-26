@@ -1,4 +1,5 @@
 const { layerFileID } = require('../../constants/cloudAssets');
+const { buildShareAppMessage } = require('../../utils/shareConfig');
 
 const HOME_LAYER_URLS = [
   layerFileID('logo-demo', 8),
@@ -27,6 +28,8 @@ function buildHomeLayers(paths) {
 }
 
 Page({
+  onShareAppMessage: buildShareAppMessage,
+
   data: {
     isExploded: true,
     hasTapped: false,

@@ -1,0 +1,6 @@
+{
+  "envId": "cloud1-d7g47tfdyf7a14a31",
+  "cloudrun": {
+    "name": "foshan-seed3d-api"
+  }
+}

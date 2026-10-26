@@ -1,0 +1,22 @@
+{
+  "name": "foshan-nianhua-seed3d",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check model-lab.js"
+  },
+  "dependencies": {
+    "@cloudbase/node-sdk": "^3.16.0",
+    "@gltf-transform/core": "^4.2.1",
+    "@gltf-transform/extensions": "^4.2.1",
+    "@gltf-transform/functions": "^4.2.1",
+    "draco3dgltf": "^1.5.7",
+    "meshoptimizer": "^0.24.0",
+    "sharp": "^0.34.3",
+    "ws": "^8.21.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

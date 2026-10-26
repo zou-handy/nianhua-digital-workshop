@@ -1,7 +1,12 @@
 const app = getApp()
-const { getApiBaseURL } = require('./utils/apiBaseURL')
+const { buildShareAppMessage } = require('../../utils/shareConfig')
+
+const CLOUDBASE_ENV_ID = 'cloud1-d7g47tfdyf7a14a31'
+const SEED3D_SERVICE = 'foshan-seed3d-api'
 
 Page({
+  onShareAppMessage: buildShareAppMessage,
+
   data: {
     imagePath: '',
     loading: false,
@@ -9,9 +14,20 @@ Page({
     modelHistory: []
   },
 
-  onLoad() {
+  onLoad(options) {
     const history = wx.getStorageSync('modelHistory') || []
-    this.setData({ modelHistory: history })
+    const presetImage = app.globalData._pendingSeed3DImage || ''
+    const presetName = app.globalData._pendingSeed3DName || ''
+    app.globalData._pendingSeed3DImage = ''
+    app.globalData._pendingSeed3DName = ''
+    this._presetModelName = presetName
+    this.setData({
+      modelHistory: history,
+      imagePath: presetImage
+    })
+    if (presetImage && options && options.source === 'volume5') {
+      wx.showToast({ title: '已预置卷五木板', icon: 'none' })
+    }
   },
 
   onShow() {
@@ -37,38 +53,23 @@ Page({
   async generate3D() {
     if (!this.data.imagePath || this.data.loading) return
 
-    let serverBase
-    try {
-      serverBase = getApiBaseURL()
-    } catch (err) {
-      wx.showModal({
-        title: '接口未配置',
-        content: err.message,
-        showCancel: false
-      })
-      return
-    }
-
+    this._sourceCloudFiles = []
     this.setData({ loading: true, loadingText: '正在压缩图片...' })
 
     try {
       const compressedPath = await this._compressImage(this.data.imagePath, 50)
-
-      this.setData({ loadingText: '正在读取图片...' })
-      const fs = wx.getFileSystemManager()
-      const imageBase64 = fs.readFileSync(compressedPath, 'base64')
-
-      this.setData({ loadingText: '正在上传图片...（如超时将自动重试）' })
+      this.setData({ loadingText: '正在上传图片到云端...' })
+      const imageUrl = await this._uploadSourceImage(compressedPath)
 
       let genRes
       try {
-        genRes = await this._submitGenerate(serverBase, imageBase64)
+        genRes = await this._submitGenerate(imageUrl)
       } catch (firstErr) {
         console.log('[AI-3D] 首次上传失败，重试中...', firstErr)
         this.setData({ loadingText: '上传超时，正在压缩后重试...' })
         const compressedPath2 = await this._compressImage(this.data.imagePath, 30)
-        const imageBase64Retry = fs.readFileSync(compressedPath2, 'base64')
-        genRes = await this._submitGenerate(serverBase, imageBase64Retry)
+        const imageUrlRetry = await this._uploadSourceImage(compressedPath2)
+        genRes = await this._submitGenerate(imageUrlRetry)
       }
 
       const taskId = genRes.taskId
@@ -76,7 +77,8 @@ Page({
 
       // 轮询任务状态
       this.setData({ loadingText: 'AI 正在生成 3D 模型...' })
-      const result = await this._pollTaskStatus(taskId, serverBase)
+      const remoteResult = await this._pollTaskStatus(taskId)
+      const result = await this._persistGeneratedFile(taskId, remoteResult)
       let localGlbPath = ''
 
       if (result.modelUrl) {
@@ -92,7 +94,7 @@ Page({
       }
 
       app.globalData._pendingModelUrl = localGlbPath
-      app.globalData._pendingModelName = 'AI 生成模型'
+      app.globalData._pendingModelName = this._presetModelName || 'AI 生成模型'
       wx.showToast({ title: '生成成功！', icon: 'success' })
       setTimeout(() => {
         wx.navigateTo({ url: '/pages/model3d-viewer/model3d-viewer' })
@@ -105,12 +107,13 @@ Page({
         showCancel: false
       })
     } finally {
+      await this._cleanupSourceImages()
       this.setData({ loading: false, loadingText: '' })
     }
   },
 
   // 每10秒查一次，最多90次（15分钟）
-  _pollTaskStatus(taskId, serverBase) {
+  _pollTaskStatus(taskId) {
     return new Promise((resolve, reject) => {
       let attempts = 0
       const maxAttempts = 90
@@ -137,11 +140,8 @@ Page({
           loadingText: loadingText
         })
 
-        wx.request({
-          url: serverBase + '/api/task-status?taskId=' + taskId,
-          method: 'GET',
-          success: (res) => {
-            const data = res.data
+        this._callSeed3D('/api/task-status?taskId=' + encodeURIComponent(taskId), 'GET')
+          .then((data) => {
             console.log('[AI-3D] 任务状态:', data.status, data)
 
             if (data._debug) {
@@ -172,11 +172,10 @@ Page({
             } else {
               setTimeout(poll, pollInterval)
             }
-          },
-          fail: () => {
+          })
+          .catch(() => {
             setTimeout(poll, pollInterval)
-          }
-        })
+          })
       }
 
       poll()
@@ -188,19 +187,27 @@ Page({
     return new Promise((resolve, reject) => {
       self.setData({ loadingText: '正在下载模型文件...' })
 
-      const downloadTask = wx.downloadFile({
-        url: fileUrl,
+      const zipPath = self._prepareDownloadPath('seed3d_downloads', 'seed3d_' + Date.now() + '.zip')
+
+      self._resolveDownloadURL(fileUrl).then((downloadUrl) => {
+        const downloadTask = wx.downloadFile({
+        url: downloadUrl,
+        filePath: zipPath,
         success: (dlRes) => {
           if (dlRes.statusCode !== 200) {
             reject(new Error('下载失败，HTTP ' + dlRes.statusCode))
             return
           }
 
-          const zipPath = dlRes.tempFilePath
           const fs = wx.getFileSystemManager()
           const unzipDir = wx.env.USER_DATA_PATH + '/seed3d_temp'
 
           self.setData({ loadingText: '正在解压模型...' })
+
+          if (!self._hasFileSignature(zipPath, [0x50, 0x4b])) {
+            reject(new Error('下载结果不是有效 ZIP，火山引擎可能返回了错误信息'))
+            return
+          }
 
           try {
             fs.accessSync(unzipDir)
@@ -243,15 +250,16 @@ Page({
           console.error('[AI-3D] 下载失败:', err)
           reject(new Error('模型文件下载失败，请重试'))
         }
-      })
-
-      downloadTask.onProgressUpdate((progress) => {
-        const received = (progress.totalBytesWritten / 1048576).toFixed(1)
-        const total = (progress.totalBytesExpectedToWrite / 1048576).toFixed(1)
-        self.setData({
-          loadingText: '正在下载模型 (' + received + 'MB/' + total + 'MB)...'
         })
-      })
+
+        downloadTask.onProgressUpdate((progress) => {
+          const received = (progress.totalBytesWritten / 1048576).toFixed(1)
+          const total = (progress.totalBytesExpectedToWrite / 1048576).toFixed(1)
+          self.setData({
+            loadingText: '正在下载模型 (' + received + 'MB/' + total + 'MB)...'
+          })
+        })
+      }).catch(reject)
     })
   },
 
@@ -260,15 +268,25 @@ Page({
     return new Promise((resolve, reject) => {
       self.setData({ loadingText: '正在下载模型文件...' })
 
-      const downloadTask = wx.downloadFile({
-        url: fileUrl,
+      const glbPath = self._prepareDownloadPath('seed3d_downloads', 'seed3d_' + Date.now() + '.glb')
+
+      self._resolveDownloadURL(fileUrl).then((downloadUrl) => {
+        const downloadTask = wx.downloadFile({
+        url: downloadUrl,
+        filePath: glbPath,
         success: (dlRes) => {
           if (dlRes.statusCode !== 200) {
             reject(new Error('下载失败，HTTP ' + dlRes.statusCode))
             return
           }
 
-          const savedModel = self._saveModelToHistory(dlRes.tempFilePath, 'AI 生成模型')
+          const downloadedPath = dlRes.filePath || glbPath
+          if (!self._hasFileSignature(downloadedPath, [0x67, 0x6c, 0x54, 0x46])) {
+            reject(new Error('下载结果不是有效 GLB，火山引擎可能返回了文本或 JSON'))
+            return
+          }
+
+          const savedModel = self._saveModelToHistory(downloadedPath, 'AI 生成模型')
           if (!savedModel) {
             reject(new Error('模型保存失败'))
             return
@@ -279,17 +297,18 @@ Page({
           console.error('[AI-3D] 下载失败:', err)
           reject(new Error('模型文件下载失败，请重试'))
         }
-      })
-
-      downloadTask.onProgressUpdate((progress) => {
-        const received = (progress.totalBytesWritten / 1048576).toFixed(1)
-        const total = progress.totalBytesExpectedToWrite > 0
-          ? '/' + (progress.totalBytesExpectedToWrite / 1048576).toFixed(1) + 'MB'
-          : ''
-        self.setData({
-          loadingText: '正在下载模型 (' + received + 'MB' + total + ')...'
         })
-      })
+
+        downloadTask.onProgressUpdate((progress) => {
+          const received = (progress.totalBytesWritten / 1048576).toFixed(1)
+          const total = progress.totalBytesExpectedToWrite > 0
+            ? '/' + (progress.totalBytesExpectedToWrite / 1048576).toFixed(1) + 'MB'
+            : ''
+          self.setData({
+            loadingText: '正在下载模型 (' + received + 'MB' + total + ')...'
+          })
+        })
+      }).catch(reject)
     })
   },
 
@@ -307,25 +326,88 @@ Page({
     })
   },
 
-  _submitGenerate(serverBase, imageBase64) {
-    return new Promise((resolve, reject) => {
-      wx.request({
-        url: serverBase + '/api/generate-3d',
-        method: 'POST',
-        timeout: 30000,
-        header: { 'Content-Type': 'application/json' },
-        data: {
-          imageUrl: 'data:image/jpeg;base64,' + imageBase64
-        },
-        success: (res) => {
-          if (res.statusCode === 200 && res.data.success) {
-            resolve(res.data)
-          } else {
-            reject(new Error(res.data.error || '提交失败'))
-          }
-        },
-        fail: reject
-      })
+  async _submitGenerate(imageUrl) {
+    const data = await this._callSeed3D('/api/generate-3d', 'POST', {
+      imageUrl
+    })
+    if (!data.success) throw new Error(data.error || '提交失败')
+    return data
+  },
+
+  async _callSeed3D(path, method, data) {
+    const response = await wx.cloud.callContainer({
+      config: { env: CLOUDBASE_ENV_ID },
+      path,
+      method,
+      header: {
+        'X-WX-SERVICE': SEED3D_SERVICE,
+        'Content-Type': 'application/json'
+      },
+      data
+    })
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw new Error((response.data && response.data.error) || 'Seed3D 服务请求失败')
+    }
+    return response.data
+  },
+
+  async _uploadSourceImage(filePath) {
+    const extensionMatch = String(filePath).match(/\.([a-zA-Z0-9]+)(?:\?|$)/)
+    const extension = extensionMatch ? extensionMatch[1].toLowerCase() : 'jpg'
+    const cloudPath = 'seed3d-inputs/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + extension
+    const uploadResult = await wx.cloud.uploadFile({ cloudPath, filePath })
+    this._sourceCloudFiles.push(uploadResult.fileID)
+
+    const urlResult = await wx.cloud.getTempFileURL({ fileList: [uploadResult.fileID] })
+    const fileInfo = urlResult.fileList && urlResult.fileList[0]
+    if (!fileInfo || fileInfo.status !== 0 || !fileInfo.tempFileURL) {
+      throw new Error((fileInfo && fileInfo.errMsg) || '获取输入图片地址失败')
+    }
+    return fileInfo.tempFileURL
+  },
+
+  async _cleanupSourceImages() {
+    const fileList = this._sourceCloudFiles || []
+    this._sourceCloudFiles = []
+    if (!fileList.length) return
+    try {
+      await wx.cloud.deleteFile({ fileList })
+    } catch (error) {
+      console.warn('[AI-3D] 清理输入图片失败:', error)
+    }
+  },
+
+  async _persistGeneratedFile(taskId, result) {
+    const sourceUrl = result.fileUrl || result.modelUrl
+    if (!sourceUrl || sourceUrl.startsWith('cloud://')) return result
+
+    this.setData({ loadingText: '正在保存模型到云端...' })
+    const response = await wx.cloud.callFunction({
+      name: 'persistSeed3DFile',
+      data: {
+        taskId,
+        sourceUrl,
+        fileFormat: result.fileFormat === 'zip' || result.fileUrl ? 'zip' : 'glb'
+      }
+    })
+    const persisted = response.result || {}
+    if (!persisted.success || !persisted.fileID) {
+      throw new Error(persisted.error || '模型转存失败')
+    }
+    return {
+      fileUrl: persisted.fileID,
+      fileFormat: persisted.fileFormat
+    }
+  },
+
+  _resolveDownloadURL(source) {
+    if (!source || !source.startsWith('cloud://')) return Promise.resolve(source)
+    return wx.cloud.getTempFileURL({ fileList: [source] }).then((result) => {
+      const fileInfo = result.fileList && result.fileList[0]
+      if (!fileInfo || fileInfo.status !== 0 || !fileInfo.tempFileURL) {
+        throw new Error((fileInfo && fileInfo.errMsg) || '获取模型下载地址失败')
+      }
+      return fileInfo.tempFileURL
     })
   },
 
@@ -345,11 +427,26 @@ Page({
       return null
     }
 
+    let thumbnailPath = ''
+    const thumbnailSource = this.data.imagePath
+    if (thumbnailSource) {
+      const extensionMatch = String(thumbnailSource).match(/\.(jpg|jpeg|png|webp)(?:\?|$)/i)
+      const thumbnailExtension = extensionMatch ? extensionMatch[1].toLowerCase() : 'jpg'
+      thumbnailPath = saveDir + '/model_' + timestamp + '_thumb.' + thumbnailExtension
+      try {
+        fs.copyFileSync(thumbnailSource, thumbnailPath)
+      } catch (error) {
+        console.warn('[AI-3D] 保存模型缩略图失败:', error)
+        thumbnailPath = ''
+      }
+    }
+
     let history = wx.getStorageSync('modelHistory') || []
     const record = {
       id: 'model_' + timestamp,
       name: modelName,
       path: savePath,
+      thumbnailPath,
       timestamp: timestamp,
       time: this._formatTime(new Date())
     }
@@ -358,11 +455,35 @@ Page({
     while (history.length > 5) {
       const old = history.pop()
       try { fs.unlinkSync(old.path) } catch (e) {}
+      if (old.thumbnailPath) {
+        try { fs.unlinkSync(old.thumbnailPath) } catch (e) {}
+      }
     }
 
     wx.setStorageSync('modelHistory', history)
     this.setData({ modelHistory: history })
     return record
+  },
+
+  _hasFileSignature(filePath, expectedBytes) {
+    const fs = wx.getFileSystemManager()
+    try {
+      const data = fs.readFileSync(filePath)
+      const bytes = new Uint8Array(data)
+      return expectedBytes.every((value, index) => bytes[index] === value)
+    } catch (err) {
+      console.error('[AI-3D] 校验模型文件失败:', err)
+      return false
+    }
+  },
+
+  _prepareDownloadPath(directoryName, fileName) {
+    const fs = wx.getFileSystemManager()
+    const directoryPath = wx.env.USER_DATA_PATH + '/' + directoryName
+    try { fs.accessSync(directoryPath) } catch (err) { fs.mkdirSync(directoryPath) }
+    const targetPath = directoryPath + '/' + fileName
+    try { fs.unlinkSync(targetPath) } catch (err) {}
+    return targetPath
   },
 
   _isZipUrl(fileUrl) {
@@ -389,6 +510,9 @@ Page({
     } catch (e) {
       wx.showToast({ title: '模型文件已删除', icon: 'none' })
       let history = this.data.modelHistory
+      if (model.thumbnailPath) {
+        try { fs.unlinkSync(model.thumbnailPath) } catch (err) {}
+      }
       history.splice(index, 1)
       wx.setStorageSync('modelHistory', history)
       this.setData({ modelHistory: history })

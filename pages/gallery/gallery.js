@@ -1,5 +1,6 @@
 const app = getApp();
 const { MODELS } = require('../../constants/cloudAssets');
+const { buildShareAppMessage } = require('../../utils/shareConfig');
 
 const MODEL_HISTORY_KEY = 'modelHistory';
 const MAX_USER_MODELS = 5;
@@ -10,6 +11,8 @@ const PRESET_MODELS = [
 ];
 
 Page({
+  onShareAppMessage: buildShareAppMessage,
+
   data: {
     models: []
   },
@@ -85,8 +88,19 @@ Page({
       id: item.id || item.path,
       name: item.name || 'AI 生成模型',
       path: item.path,
+      thumbnailPath: this._getValidThumbnailPath(fs, item.thumbnailPath),
       emoji: '🎨',
       color: '#D4A849'
     }));
+  },
+
+  _getValidThumbnailPath(fs, thumbnailPath) {
+    if (!thumbnailPath) return '';
+    try {
+      fs.accessSync(thumbnailPath);
+      return thumbnailPath;
+    } catch (err) {
+      return '';
+    }
   }
 });

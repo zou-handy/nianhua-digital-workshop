@@ -1,0 +1,8 @@
+{
+  "name": "persist-seed3d-file",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@cloudbase/node-sdk": "^3.16.0"
+  }
+}

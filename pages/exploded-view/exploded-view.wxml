@@ -6,7 +6,10 @@
     </view>
 
     <view class="top-title-area">
-      <text class="top-title">五色套印</text>
+      <view class="top-title-row">
+        <text class="top-title">{{layers.length ? (layers.length + '色套印') : '分色套印'}}</text>
+        <view class="ai-tag" wx:if="{{colorLayersList[currentIndex].isPreset === false}}">AI生成</view>
+      </view>
       <text class="top-subtitle">佛山木版年画 · 数字分色</text>
     </view>
 
@@ -20,7 +23,7 @@
   <!-- ═══════════════ 加载态 ═══════════════ -->
   <view class="loading-panel" wx:if="{{loading}}">
     <view class="loading-ring"></view>
-    <text class="loading-text">正在分析色层...（{{loadingProgress}}）</text>
+    <text class="loading-text">{{loadingText}}</text>
   </view>
 
   <!-- ═══════════════ 中心：3D 视角区 ═══════════════ -->
@@ -30,10 +33,12 @@
   >
     <view
       class="stage"
-      bindtap="toggleExplode"
+      bindtap="onStageTap"
+      bindlongpress="onStageLongPress"
       bindtouchstart="onTouchStart"
       bindtouchmove="onTouchMove"
       bindtouchend="onTouchEnd"
+      bindtouchcancel="onTouchEnd"
     >
       <view
         class="layers-container"
@@ -68,6 +73,11 @@
 
   <!-- ═══════════════ 底部：图层控制条 ═══════════════ -->
   <view class="bottom-dock" wx:if="{{!loading && layers.length > 0}}">
+    <!-- AI生成内容提示 -->
+    <view class="ai-content-notice" wx:if="{{colorLayersList[currentIndex].isPreset === false}}">
+      <text class="ai-content-notice-text">当前作品由人工智能（AI）生成，仅供参考</text>
+    </view>
+
     <!-- 作品指示器 -->
     <view class="dock-indicator" wx:if="{{colorLayersList.length > 1}}">
       <text class="dock-indicator-text">{{currentIndex + 1}} / {{colorLayersList.length}}</text>
@@ -108,4 +118,6 @@
       </view>
     </view>
   </view>
+
+  <ai-float id="aiFloat"></ai-float>
 </view>

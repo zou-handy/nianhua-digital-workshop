@@ -1,5 +1,6 @@
 const { layerFileID } = require('../../constants/cloudAssets');
 const { downloadCloudFile } = require('./utils/downloadCloudFile');
+const { buildShareAppMessage } = require('../../utils/shareConfig');
 
 const PRESET_LAYER_META = [
   { color: '#1a1a1a', label: '墨线稿', order: 1, desc: '松烟墨·定轮廓' },
@@ -12,6 +13,8 @@ const PRESET_LAYER_META = [
 const GALLERY_ID = 'nianhua-demo';
 
 Page({
+  onShareAppMessage: buildShareAppMessage,
+
   data: {
     loading: true,
     layers: [],

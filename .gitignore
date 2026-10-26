@@ -1,2 +1,52 @@
+# Dependencies
 node_modules/
+**/node_modules/
+miniprogram_npm/@cloudbase/
+miniprogram_npm/detect-libc/
+miniprogram_npm/semver/
+miniprogram_npm/sharp/
+miniprogram_npm/**/*.map
+
+# WeChat DevTools private config and keys
 project.private.config.json
+
+# Local AI / editor state
+.claude/
+.codex/
+.cursor/
+.vscode/
+.agent/
+.agents/
+.clinerules/
+.codebuddy/
+.comate/
+.gemini/
+.iflow/
+.kiro/
+.lingma/
+.qoder/
+.qwen/
+.roo/
+.rules/
+.trae/
+.windsurf/
+.workbuddy/
+codebuddy-plugin/
+
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Large binary assets & outputs (saved in G: Drive Vault)
+outputs/*
+!outputs/ui-copy-review/
+cloud_assets_backup/
+*.glb
+*.mp4
+*.zip
+
+# Logs and OS metadata
+*.log
+.DS_Store
+Thumbs.db

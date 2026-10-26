@@ -1,10 +1,15 @@
 {
   "lazyCodeLoading": "requiredComponents",
   "pages": [
-    "pages/home/home",
-    "pages/index/index"
+    "pages/home/home"
   ],
   "subPackages": [
+    {
+      "root": "pages/index",
+      "pages": [
+        "index"
+      ]
+    },
     {
       "root": "pages/ai-chat",
       "pages": [

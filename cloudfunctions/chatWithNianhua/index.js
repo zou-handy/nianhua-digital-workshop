@@ -75,7 +75,7 @@ exports.main = async (event, context) => {
   try {
     const model = ai.createModel('hunyuan-exp');
     const result = await model.generateText({
-      model: 'hunyuan-2.0-instruct-20251111',
+      model: 'hy3-preview',
       messages: fullMessages,
       temperature: 0.7,
       topP: 0.9

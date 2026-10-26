@@ -1,11 +1,15 @@
 const { downloadFileToTemp } = require('./utils/downloadCloudFile');
 const { requestSplitColors } = require('./utils/splitColors');
 const { saveLayerImage } = require('./utils/saveLayerImage');
+const { buildNianhuaImagePrompt } = require('../../utils/nianhuaImagePrompt');
+const { buildShareAppMessage } = require('../../utils/shareConfig');
 
 const USER_CACHE_KEY = 'userColorLayers';
 const MAX_USER_RECORDS = 10;
 
 Page({
+  onShareAppMessage: buildShareAppMessage,
+
   data: {
     inputText: '',
     generatedImageUrl: '',
@@ -32,14 +36,7 @@ Page({
 
     if (this.data.loading) return;
 
-    const prompt = '请严格按照以下要求生成图片：'
-      + '【风格】中国佛山木版年画，传统民间版画风格，绝对不要写实风格，绝对不要3D风格'
-      + '【主题】' + inputText
-      + '【色彩】只使用5种以内的纯色（红、黄、深黄、蓝、黑、白色背景），不要使用绿色。每种颜色是纯色色块填充，禁止任何渐变色，禁止任何光影效果，禁止高光，禁止阴影，禁止半透明'
-      + '【线条】黑色粗线条勾勒轮廓，线条清晰粗犷，类似木刻版画的刀刻效果'
-      + '【构图】白色纯净背景，主体居中，构图饱满，装饰性强'
-      + '【技法】模仿木版套印工艺，每个区域都是单一纯色填充，色块之间边界清晰锐利，像是用不同颜色的木版分别印刷上去的效果'
-      + '【禁止】禁止写实风格，禁止摄影风格，禁止渐变，禁止光影，禁止高光，禁止阴影，禁止模糊边缘';
+    const promptConfig = buildNianhuaImagePrompt(inputText);
 
     this.setData({
       loading: true,
@@ -50,7 +47,8 @@ Page({
     wx.cloud.callFunction({
       name: 'generateImage-PBKj5J',
       data: {
-        prompt,
+        prompt: promptConfig.prompt,
+        negative_prompt: promptConfig.negativePrompt,
         model: 'hunyuan-image',
         version: 'v1.9',
         size: '1024x1024',

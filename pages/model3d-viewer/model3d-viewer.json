@@ -1,5 +1,8 @@
 {
   "navigationStyle": "custom",
   "disableScroll": true,
-  "pageOrientation": "auto"
+  "pageOrientation": "auto",
+  "usingComponents": {
+    "ai-float": "/components/ai-float/ai-float"
+  }
 }

@@ -1,7 +1,15 @@
 {
   "envId": "cloud1-d7g47tfdyf7a14a31",
   "functionRoot": "./functions",
-  "functions": [],
+  "functions": [
+    {
+      "name": "splitColors",
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "timeout": 30,
+      "memorySize": 256
+    }
+  ],
   "ai": {
     "defaultAgent": "{{env.AI_DEFAULT_AGENT}}",
     "agents": {

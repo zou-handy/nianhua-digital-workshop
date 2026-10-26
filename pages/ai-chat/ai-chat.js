@@ -1,15 +1,31 @@
-const { generateReply } = require('../../utils/nianhuaKnowledge');
+const { askXiaonian, getCapabilityText, getAvatarState, toggleAvatar } = require('../../utils/xiaonianAI');
+const { buildShareAppMessage } = require('../../utils/shareConfig');
 
 Page({
+  onShareAppMessage: buildShareAppMessage,
+
   data: {
     messages: [],
     inputText: '',
     isRunning: false,
-    scrollToId: ''
+    scrollToId: '',
+    avatarUrl: '',
+    avatarGender: 'girl',
+    capabilityText: getCapabilityText()
   },
 
   onLoad() {
     this._msgId = 0;
+    this._history = [];
+    this.setData(getAvatarState());
+  },
+
+  onShow() {
+    this.setData(getAvatarState());
+  },
+
+  switchAvatar() {
+    this.setData(toggleAvatar());
   },
 
   onInput(e) {
@@ -22,7 +38,7 @@ Page({
     this.sendMessage();
   },
 
-  sendMessage() {
+  async sendMessage() {
     const text = this.data.inputText.trim();
     if (!text || this.data.isRunning) return;
 
@@ -33,6 +49,7 @@ Page({
     };
 
     const messages = this.data.messages.concat([userMsg]);
+    this._history.push({ role: 'user', content: text });
     this.setData({
       messages: messages,
       inputText: '',
@@ -40,9 +57,13 @@ Page({
     });
     this._scrollToBottom();
 
-    // 本地知识库回复
-    const reply = generateReply(text);
-    this._typeWriterReply(reply);
+    const result = await askXiaonian({
+      text,
+      history: this._history,
+      pageContext: '小年 AI 独立聊天页'
+    });
+    this._history.push({ role: 'assistant', content: result.reply });
+    this._typeWriterReply(result.reply);
   },
 
   _typeWriterReply(reply) {

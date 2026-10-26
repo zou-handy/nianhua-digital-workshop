@@ -35,6 +35,7 @@
 
 .chat-avatar-wrap {
   flex-shrink: 0;
+  position: relative;
 }
 
 .chat-avatar {
@@ -44,6 +45,21 @@
   border: 2rpx solid rgba(230, 168, 23, 0.3);
 }
 
+.avatar-switch-badge {
+  position: absolute;
+  right: -6rpx;
+  bottom: -4rpx;
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 50%;
+  background: #c41e3a;
+  color: #fff7e6;
+  font-size: 18rpx;
+  line-height: 28rpx;
+  text-align: center;
+  border: 2rpx solid #0f0805;
+}
+
 .chat-title-wrap {
   flex: 1;
   display: flex;
@@ -51,10 +67,56 @@
   gap: 4rpx;
 }
 
+.chat-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
 .chat-title {
   font-size: 32rpx;
   font-weight: 600;
   color: #fff7e6;
+}
+
+/* AI生成标识徽章 */
+.ai-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  background: linear-gradient(135deg, rgba(196, 30, 58, 0.85), rgba(230, 168, 23, 0.85));
+  color: #fff7e6;
+  font-size: 18rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  line-height: 1.6;
+}
+
+/* AI生成内容显著提示条 */
+.ai-notice-bar {
+  flex-shrink: 0;
+  padding: 12rpx 32rpx;
+  background: rgba(230, 168, 23, 0.1);
+  border-bottom: 1rpx solid rgba(230, 168, 23, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-notice-text {
+  font-size: 22rpx;
+  color: rgba(230, 168, 23, 0.85);
+  letter-spacing: 1rpx;
+}
+
+/* 单条AI消息生成标识 */
+.msg-ai-label {
+  font-size: 18rpx;
+  color: rgba(230, 168, 23, 0.55);
+  margin-top: 6rpx;
+  margin-left: 72rpx;
+  letter-spacing: 1rpx;
 }
 
 .chat-status {

@@ -12,6 +12,8 @@ App({
     userInfo: null,
     currentLayers: null,
     _pendingModelUrl: '',
-    _pendingModelName: ''
+    _pendingModelName: '',
+    _pendingModelPreview: '',
+    _pendingModelMode: ''
   }
 })

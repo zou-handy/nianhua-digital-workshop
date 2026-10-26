@@ -1,7 +1,15 @@
 <view class="ai-create-page">
   <view class="header">
-    <text class="title">AI 年画创作</text>
-    <text class="subtitle">输入主题，生成适合五色套印的佛山木版年画</text>
+    <view class="title-row">
+      <text class="title">AI 年画创作</text>
+      <view class="ai-tag">AI生成</view>
+    </view>
+    <text class="subtitle">输入主题，生成适合四色套印的佛山木版年画</text>
+  </view>
+
+  <!-- AI生成内容显著标识 -->
+  <view class="ai-notice-bar">
+    <text class="ai-notice-text">本页年画作品由人工智能（AI）生成，仅供参考</text>
   </view>
 
   <view class="form-panel">
@@ -24,7 +32,10 @@
   </view>
 
   <view class="result-panel" wx:if="{{generatedImageUrl && !loading}}">
-    <image class="result-image" src="{{generatedImageUrl}}" mode="aspectFit"></image>
+    <view class="result-image-wrap">
+      <image class="result-image" src="{{generatedImageUrl}}" mode="aspectFit"></image>
+      <view class="result-ai-badge">AI生成</view>
+    </view>
     <view class="action-row">
       <button class="secondary-btn" bindtap="onRegenerate" disabled="{{splitLoading}}">不满意，重新生成</button>
       <button class="primary-btn" bindtap="onSplitColors" loading="{{splitLoading}}" disabled="{{splitLoading}}">

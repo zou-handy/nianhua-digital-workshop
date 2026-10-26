@@ -4,13 +4,22 @@
     <view class="chat-back" bindtap="goBack">
       <text class="chat-back-icon">←</text>
     </view>
-    <view class="chat-avatar-wrap">
-      <image class="chat-avatar" src="https://cloudcache.tencent-cloud.com/qcloud/ui/static/static_source_business/21235b0d-8db2-4e30-b946-3973e6f99c00.png" mode="aspectFill"></image>
+    <view class="chat-avatar-wrap" bindtap="switchAvatar">
+      <image class="chat-avatar" src="{{avatarUrl}}" mode="aspectFill"></image>
+      <view class="avatar-switch-badge">↻</view>
     </view>
     <view class="chat-title-wrap">
-      <text class="chat-title">小年</text>
+      <view class="chat-title-row">
+        <text class="chat-title">小年</text>
+        <view class="ai-tag">AI生成</view>
+      </view>
       <text class="chat-status">{{isRunning ? '正在思考...' : '佛山年画传承助手'}}</text>
     </view>
+  </view>
+
+  <!-- AI生成内容显著标识 -->
+  <view class="ai-notice-bar">
+    <text class="ai-notice-text">本页内容由人工智能（AI）生成，仅供参考</text>
   </view>
 
   <!-- 消息列表 -->
@@ -25,16 +34,19 @@
     <view class="chat-welcome" wx:if="{{messages.length === 0}}">
       <view class="chat-welcome-icon">🏮</view>
       <text class="chat-welcome-title">你好，我是小年</text>
-      <text class="chat-welcome-desc">佛山木版年画数字传承助手</text>
+      <text class="chat-welcome-desc">{{capabilityText}}</text>
       <view class="chat-suggestions">
         <view class="chat-suggestion" bindtap="sendSuggestion" data-text="佛山年画有什么特色？">
           <text>佛山年画有什么特色？</text>
         </view>
-        <view class="chat-suggestion" bindtap="sendSuggestion" data-text="五色套印是什么工艺？">
-          <text>五色套印是什么工艺？</text>
+        <view class="chat-suggestion" bindtap="sendSuggestion" data-text="打开3D模型展厅">
+          <text>打开3D模型展厅</text>
         </view>
-        <view class="chat-suggestion" bindtap="sendSuggestion" data-text="门神有哪些故事？">
-          <text>门神有哪些故事？</text>
+        <view class="chat-suggestion" bindtap="sendSuggestion" data-text="打开AI图生3D">
+          <text>打开AI图生3D</text>
+        </view>
+        <view class="chat-suggestion" bindtap="sendSuggestion" data-text="打开年画分色套印体验">
+          <text>打开年画分色套印体验</text>
         </view>
       </view>
     </view>
@@ -48,16 +60,17 @@
       <image
         wx:if="{{item.role === 'assistant'}}"
         class="msg-avatar"
-        src="https://cloudcache.tencent-cloud.com/qcloud/ui/static/static_source_business/21235b0d-8db2-4e30-b946-3973e6f99c00.png"
+        src="{{avatarUrl}}"
         mode="aspectFill"
       ></image>
       <view class="msg-bubble {{item.role === 'user' ? 'bubble-user' : 'bubble-assistant'}}">
         <text class="msg-text" user-select>{{item.content}}</text>
       </view>
+      <view wx:if="{{item.role === 'assistant'}}" class="msg-ai-label">AI生成</view>
     </view>
 
     <view wx:if="{{isRunning && messages.length > 0}}" class="msg-row msg-assistant">
-      <image class="msg-avatar" src="https://cloudcache.tencent-cloud.com/qcloud/ui/static/static_source_business/21235b0d-8db2-4e30-b946-3973e6f99c00.png" mode="aspectFill"></image>
+      <image class="msg-avatar" src="{{avatarUrl}}" mode="aspectFill"></image>
       <view class="msg-bubble bubble-assistant">
         <view class="typing-indicator">
           <view class="typing-dot"></view>
