@@ -22,6 +22,17 @@ function createCloudPath(ext) {
   return `ai-generated-images/${Date.now()}-${random}.${ext}`;
 }
 
+async function resolveSourceImageUrl(app, source) {
+  if (!source) return '';
+  if (/^https?:\/\//i.test(source)) return source;
+  if (String(source).startsWith('cloud://')) {
+    const res = await app.getTempFileURL({ fileList: [source] });
+    const item = res && res.fileList && res.fileList[0];
+    if (item && item.tempFileURL) return item.tempFileURL;
+  }
+  return '';
+}
+
 async function persistImageToStorage(app, imageUrl) {
   if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) {
     return null;
@@ -46,7 +57,7 @@ async function persistImageToStorage(app, imageUrl) {
   };
 }
 
-exports.main = async (event) => {
+exports.main = async (event = {}) => {
   const app = tcb.init({ env: tcb.SYMBOL_CURRENT_ENV });
   const ai = app.ai();
   const imageModel = ai.createImageModel(process.env.PROVIDER || 'hunyuan-image');
@@ -69,21 +80,49 @@ exports.main = async (event) => {
     version = 'v1.9',
     size = '1024x1024',
     revise = false,
+    sourceImage,
+    sourceImageUrl,
+    sourceFileID,
     ...restEvent
   } = event;
   const supportedSize = ['1024x1024', '768x768'].indexOf(size) > -1 ? size : '1024x1024';
 
   try {
-    const res = await imageModel.generateImage({
-      model,
-      version,
-      size: supportedSize,
-      revise,
-      ...(style ? { style } : {}),
-      ...restEvent
-    });
+    let res = null;
+    let usedMode = 't2i';
+    const refUrl = await resolveSourceImageUrl(app, sourceImageUrl || sourceFileID || sourceImage);
 
-    const { data, error } = res;
+    // 若传入了实拍参考图，优先尝试混元 3.0 图生图 (I2I) 接口，失败则自动无缝回退至文生图重绘
+    if (refUrl) {
+      try {
+        const i2iRes = await imageModel.generateImage({
+          model: 'HY-Image-v3.0-I2I-ToB-v1.0.1',
+          prompt: event.prompt,
+          size: supportedSize,
+          image_urls: [refUrl],
+          revise: { value: false }
+        });
+        if (i2iRes && !i2iRes.error && i2iRes.data && i2iRes.data[0] && i2iRes.data[0].url) {
+          res = i2iRes;
+          usedMode = 'i2i';
+        }
+      } catch (i2iErr) {
+        console.warn('[generateImage] I2I 接口不可用，自动回退标准重绘:', i2iErr && i2iErr.message);
+      }
+    }
+
+    if (!res) {
+      res = await imageModel.generateImage({
+        model,
+        version,
+        size: supportedSize,
+        revise,
+        ...(style ? { style } : {}),
+        ...restEvent
+      });
+    }
+
+    const { data, error } = res || {};
 
     if (error) {
       return { success: false, ...error };
@@ -95,6 +134,7 @@ exports.main = async (event) => {
 
     return {
       ...rest,
+      mode: usedMode,
       imageUrl: storedImage?.fileID || url || '',
       fileID: storedImage?.fileID || '',
       originalImageUrl: url || '',

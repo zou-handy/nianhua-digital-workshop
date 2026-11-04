@@ -15,11 +15,14 @@
   <view class="preview-area" wx:if="{{previewImage}}">
     <image class="preview-img" src="{{previewImage}}" mode="aspectFit" />
     <view class="preview-actions">
-      <view class="action-btn action-reselect" bindtap="chooseImage">
-        <text>重新选择</text>
+      <view class="action-btn action-reselect" bindtap="chooseImage" wx:if="{{!analyzing}}">
+        <text>重新自拍</text>
       </view>
-      <view class="action-btn action-analyze" bindtap="startAnalyze" wx:if="{{!analyzing}}">
-        <text>开始分色分析</text>
+      <view class="action-btn action-analyze" bindtap="animeAndAnalyze" wx:if="{{!analyzing}}">
+        <text>AI二次元年画+分色</text>
+      </view>
+      <view class="action-btn action-reselect" bindtap="startAnalyze" wx:if="{{!analyzing}}">
+        <text>原图直接分色</text>
       </view>
       <view class="action-btn action-analyzing" wx:if="{{analyzing}}">
         <view class="mini-loading"></view>

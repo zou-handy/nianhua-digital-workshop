@@ -1,9 +1,13 @@
-const { requestSplitColors } = require('./utils/splitColors');
-const { saveLayerImage } = require('./utils/saveLayerImage');
 const { buildShareAppMessage } = require('../../utils/shareConfig');
-
-const USER_CACHE_KEY = 'userColorLayers';
-const MAX_USER_RECORDS = 10;
+const {
+  requestSplitColors,
+  stylizePhotoToWoodblockNianhua,
+  generateAnimeNianhuaFromPhoto,
+  compressLocalImage,
+  uploadSourceImageToCloud,
+  readLocalFileAsDataUrl,
+  saveWorkToDualStores
+} = require('../../utils/nianhuaPipeline');
 
 Page({
   onShareAppMessage: buildShareAppMessage,
@@ -18,121 +22,134 @@ Page({
     wx.chooseMedia({
       count: 1,
       mediaType: ['image'],
-      sourceType: ['album', 'camera'],
+      sourceType: ['camera', 'album'],
+      camera: 'front',
       success: (res) => {
         const tempPath = res.tempFiles[0].tempFilePath;
+        this._rawImage = tempPath;
+        this._cachedSplit = null;
         this.setData({ previewImage: tempPath });
       }
     });
   },
 
-  async startAnalyze() {
-    if (!this.data.previewImage) return;
+  async animeAndAnalyze() {
+    if (!this.data.previewImage || this.data.analyzing) return;
+    this.setData({ analyzing: true, analyzeText: '正在识别自拍特征并生成二次元年画...' });
+    try {
+      const src = this._rawImage || this.data.previewImage;
+      const animeRes = await generateAnimeNianhuaFromPhoto(src);
+      const animeImg = animeRes.fileID || animeRes.imageUrl;
+      this.setData({ previewImage: animeRes.imageUrl || animeRes.fileID, analyzeText: '正在拆解二次元年画多色雕版...' });
+      const result = await requestSplitColors(animeImg, {
+        photoMode: 'auto',
+        removeBackground: true,
+        maxColors: 'auto',
+        flattenPalette: true
+      });
+      const saved = saveWorkToDualStores(result, {
+        title: '自拍二次元年画 · ' + new Date().toLocaleDateString(),
+        mode: 'flat',
+        sourceFileID: animeRes.fileID || '',
+        sourceImage: animeRes.imageUrl || animeImg
+      });
+      const plateCount = (saved && saved.advancedWork && saved.advancedWork.steps && saved.advancedWork.steps.length) || 4;
+      this.setData({ analyzing: false, previewImage: '' });
+      wx.showModal({
+        title: `${plateCount}色二次元年画制版完成！`,
+        content: `已将自拍转化为国潮二次元木版年画并拆出 ${plateCount} 块雕版，同步至展厅与卷五版台`,
+        confirmText: '去展厅查看',
+        cancelText: '继续自拍',
+        success: (res) => {
+          if (res.confirm) {
+            wx.navigateTo({ url: '/pages/exploded-view/exploded-view?showLatestUser=true' });
+          }
+        }
+      });
+    } catch (err) {
+      console.error('[create] 二次元年画化失败:', err);
+      this.setData({ analyzing: false });
+      wx.showToast({ title: 'AI生成超时，请点动态分色制版', icon: 'none' });
+    }
+  },
 
-    this.setData({ analyzing: true, analyzeText: '正在压缩图片...' });
+  async stylizeImage() {
+    if (!this.data.previewImage || this.data.analyzing) return;
+    this.setData({ analyzing: true, analyzeText: '正在转木版年画风格...' });
+    try {
+      const src = this._rawImage || this.data.previewImage;
+      const stylized = await stylizePhotoToWoodblockNianhua(src, {
+        removeBackground: true,
+        maxColors: 'auto'
+      });
+      this._cachedSplit = stylized.splitResult || null;
+      this.setData({
+        previewImage: stylized.imageUrl,
+        analyzing: false
+      });
+      wx.showToast({ title: `已转为${stylized.plateCount || 4}色木版画`, icon: 'success' });
+    } catch (err) {
+      console.error('[create] 风格化失败:', err);
+      this.setData({ analyzing: false });
+      wx.showToast({ title: '风格化失败，可直接分色', icon: 'none' });
+    }
+  },
+
+  async startAnalyze() {
+    if (!this.data.previewImage || this.data.analyzing) return;
+
+    this.setData({ analyzing: true, analyzeText: '正在压缩预处理...' });
 
     try {
-      // 压缩图片
-      const compressedPath = await this._compressImage(this.data.previewImage);
+      const compressedPath = await compressLocalImage(this._rawImage || this.data.previewImage, 80);
 
-      this.setData({ analyzeText: '正在上传分析...' });
-
-      // 转 base64
-      const fs = wx.getFileSystemManager();
-      const base64 = wx.arrayBufferToBase64(fs.readFileSync(compressedPath));
-      const dataUrl = 'data:image/jpeg;base64,' + base64;
-
-      // 调用分色API
-      this.setData({ analyzeText: '正在AI分色处理...' });
-      const result = await this._requestSplitColors(dataUrl);
-
-      if (!result.layers || result.layers.length === 0) {
-        throw new Error('分色结果为空');
-      }
-
-      this.setData({ analyzeText: '正在保存结果...' });
-
-      // 保存图层到本地文件
-      const timestamp = Date.now();
-      const id = 'user_' + timestamp;
-      const layers = [];
-
-      for (let i = 0; i < result.layers.length; i++) {
-        const layer = result.layers[i];
-        if (layer.fileID) {
-          layers.push({
-            tempPath: layer.fileID,
-            fileID: layer.fileID,
-            color: layer.color || '',
-            label: layer.label || ('图层' + (i + 1))
-          });
-          continue;
+      let result = this._cachedSplit;
+      if (!result) {
+        this.setData({ analyzeText: '正在提取墨线与动态套版...' });
+        let imageSource = '';
+        try {
+          imageSource = await uploadSourceImageToCloud(compressedPath, 'user-creation/source');
+        } catch (uploadErr) {
+          console.warn('[create] 云存储上传降级为 Base64:', uploadErr);
+          imageSource = await readLocalFileAsDataUrl(compressedPath);
         }
 
-        const filePath = wx.env.USER_DATA_PATH + '/user_layer_' + id + '_' + i + '.png';
-        const saved = await saveLayerImage(layer, filePath, fs);
-        if (!saved) continue;
-
-        layers.push({
-          tempPath: filePath,
-          color: layer.color || '',
-          label: layer.label || ('图层' + (i + 1))
+        result = await requestSplitColors(imageSource, {
+          photoMode: 'photo',
+          removeBackground: true,
+          maxColors: 'auto',
+          flattenPalette: true
         });
       }
+      this._cachedSplit = null;
 
-      if (layers.length === 0) throw new Error('图层保存失败');
-
-      // 保存原图到本地（用于展厅卡片缩略图）
-      const originalSavePath = wx.env.USER_DATA_PATH + '/original_' + id + '.jpg';
-      try {
-        fs.saveFileSync(this.data.previewImage, originalSavePath);
-      } catch(e) {
-        // 如果 saveFile 失败，尝试 copyFile
-        try {
-          fs.copyFileSync(this.data.previewImage, originalSavePath);
-        } catch(e2) {
-          console.error('保存原图失败:', e2);
-        }
-      }
-
-      // 存入用户分色历史
-      let userList = [];
-      try {
-        const stored = wx.getStorageSync(USER_CACHE_KEY);
-        userList = Array.isArray(stored) ? stored : [];
-      } catch(e) {}
-
-      userList.unshift({
-        id: id,
-        title: '我的年画 · ' + new Date().toLocaleDateString(),
-        isPreset: false,
-        layers: layers,
-        originalImage: originalSavePath,
-        timestamp: timestamp
+      this.setData({ analyzeText: '正在装入展厅与卷五版台...' });
+      const saved = saveWorkToDualStores(result, {
+        title: '实拍年画 · ' + new Date().toLocaleDateString(),
+        mode: 'photo',
+        sourceImage: compressedPath
       });
-
-      wx.setStorageSync(USER_CACHE_KEY, userList.slice(0, MAX_USER_RECORDS));
+      const plateCount = (saved && saved.advancedWork && saved.advancedWork.steps && saved.advancedWork.steps.length) || 4;
 
       this.setData({ analyzing: false, previewImage: '' });
 
       wx.showModal({
-        title: '分色完成！',
-        content: '已保存到2D分色展厅',
-        confirmText: '去查看',
+        title: `${plateCount}色木版制版完成！`,
+        content: `已提取 ${plateCount} 块雕版并同步至 2D 分色展厅与卷五交互版台`,
+        confirmText: '去展厅查看',
         cancelText: '继续上传',
         success: (res) => {
           if (res.confirm) {
-            wx.navigateTo({ url: '/pages/exploded-view/exploded-view' });
+            wx.navigateTo({ url: '/pages/exploded-view/exploded-view?showLatestUser=true' });
           }
         }
       });
-
     } catch (err) {
       console.error('[分色] 错误:', err);
       this.setData({ analyzing: false });
       wx.showModal({
         title: '分色失败',
-        content: err.message || '请重试',
+        content: (err && err.message) || '请重试',
         showCancel: false
       });
     }
@@ -142,20 +159,5 @@ Page({
     wx.navigateTo({
       url: '/pages/exploded-view/exploded-view'
     });
-  },
-
-  _compressImage(src) {
-    return new Promise((resolve, reject) => {
-      wx.compressImage({
-        src: src,
-        quality: 50,
-        success: (res) => resolve(res.tempFilePath),
-        fail: () => resolve(src) // 压缩失败就用原图
-      });
-    });
-  },
-
-  _requestSplitColors(imageBase64) {
-    return requestSplitColors(imageBase64, { removeBackground: false });
   }
 });

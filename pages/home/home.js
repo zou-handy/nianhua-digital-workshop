@@ -4,6 +4,17 @@ const { Engine3D: NianhuaGalleryEngine } = require('../../utils/nianhuaGalleryEn
 const { buildNianhuaImagePrompt } = require('../../utils/nianhuaImagePrompt');
 const modelLab = require('../../utils/modelLabAPI');
 const { buildShareAppMessage, buildShareTimeline } = require('../../utils/shareConfig');
+const {
+  requestSplitColors,
+  stylizePhotoToWoodblockNianhua,
+  generateAnimeNianhuaFromPhoto,
+  compressLocalImage,
+  uploadSourceImageToCloud,
+  readLocalFileAsDataUrl,
+  requestNianhuaImageGeneration,
+  buildAdvancedWorkFromRecord,
+  saveWorkToDualStores
+} = require('../../utils/nianhuaPipeline');
 
 function normalizeFeedToken(feedToken) {
   const normalizedToken = String(feedToken || '').trim().replace(/^token\//, '');
@@ -226,6 +237,16 @@ const ADVANCED_STEP_META = [
 
 function getAdvancedPrintSteps(workIndex) {
   const work = runtimeAdvancedPrintSets[workIndex] || runtimeAdvancedPrintSets[0];
+  if (work && Array.isArray(work.steps) && work.steps.length > 0) {
+    return work.steps.map(function(step, idx) {
+      const fallbackMeta = ADVANCED_STEP_META[idx] || ADVANCED_STEP_META[0];
+      return Object.assign({}, fallbackMeta, step, {
+        boardImage: step.boardImage || (work.boards && work.boards[step.key]) || '',
+        modelFileID: step.modelFileID || (work.models && work.models[step.key]) || '',
+        layerImage: step.layerImage || (work.layers && work.layers[step.key]) || ''
+      });
+    });
+  }
   return ADVANCED_STEP_META.map(function(meta) {
     return Object.assign({}, meta, {
       boardImage: work.boards[meta.key],
@@ -238,40 +259,10 @@ function getAdvancedPrintSteps(workIndex) {
 const ADVANCED_PRINT_STEPS = getAdvancedPrintSteps(0);
 
 function buildUserAdvancedWork(record, original, ordinal) {
-  var remaining = (record.layers || []).slice();
-  var patterns = {
-    black: /墨|黑|ink|black/i,
-    red: /红|赤|red|pink/i,
-    yellow: /黄|金|yellow|gold/i,
-    green: /绿|青|蓝|green|cyan|blue/i
-  };
-  var picked = {};
-  Object.keys(patterns).forEach(function(key) {
-    var index = remaining.findIndex(function(layer) {
-      return patterns[key].test(String(layer.label || '') + ' ' + String(layer.color || ''));
-    });
-    if (index > -1) picked[key] = remaining.splice(index, 1)[0];
-  });
-  ['black', 'red', 'yellow', 'green'].forEach(function(key) {
-    if (!picked[key]) picked[key] = remaining.shift() || record.layers[0];
-  });
-  var sourceOf = function(layer) { return layer && (layer.fileID || layer.tempPath) || ''; };
-  return {
-    id: record.id,
-    name: '作品' + ordinal + ' · ' + (record.title || '数字二创'),
-    original: original || sourceOf(record.layers[0]),
-    isUserCreated: true,
-    createdAt: record.timestamp || Date.now(),
-    boards: {
-      black: sourceOf(picked.black), red: sourceOf(picked.red),
-      yellow: sourceOf(picked.yellow), green: sourceOf(picked.green)
-    },
-    layers: {
-      black: sourceOf(picked.black), red: sourceOf(picked.red),
-      yellow: sourceOf(picked.yellow), green: sourceOf(picked.green)
-    },
-    models: { black: '', red: '', yellow: '', green: '' }
-  };
+  return buildAdvancedWorkFromRecord(
+    Object.assign({}, record, { original: original || (record && record.original) }),
+    ordinal || 3
+  );
 }
 
 const CRAFT_STEPS = [
@@ -702,6 +693,8 @@ Page({
     advancedCreatorInput: '',
     advancedCreatorImage: '',
     advancedCreatorFileID: '',
+    advancedCreatorSourceType: '',
+    advancedCreatorPlateCount: 'auto',
     advancedCreatorGenerating: false,
     advancedCreatorSplitting: false,
     advancedCreatorStage: '',
@@ -836,6 +829,7 @@ Page({
   },
 
   onShow() {
+    this._loadAdvancedUserWorks();
     if (this.data.currentPage === NIANHUA_GALLERY_PAGE) this._startNianhuaGalleryLoop();
     if (this.data.currentPage === 4) {
       wx.nextTick(() => {
@@ -1467,6 +1461,8 @@ Page({
     this.setData({
       advancedWorkIndex: index,
       advancedCurrentWork: runtimeAdvancedPrintSets[index],
+      advancedBlockCount: steps.length,
+      advancedLastBlockIndex: steps.length - 1,
       advancedBlockIndex: 0,
       advancedActiveBlock: steps[0],
       advancedPlacedBlockIndex: -1,
@@ -1568,11 +1564,12 @@ Page({
     var blockIndex = this.data.advancedPlacedBlockIndex;
     if (blockIndex < 0) return;
 
+    var totalBlocks = this.data.advancedBlockCount || ADVANCED_PRINT_STEPS.length;
     var printedSteps = this.data.advancedPrintedSteps.slice();
 
     if (printedSteps.indexOf(blockIndex) === -1) {
       printedSteps.push(blockIndex);
-    } else if (printedSteps.length >= ADVANCED_PRINT_STEPS.length) {
+    } else if (printedSteps.length >= totalBlocks) {
       return;
     }
 
@@ -1583,8 +1580,8 @@ Page({
     var workIndex = this.data.advancedWorkIndex;
     var step = getAdvancedPrintSteps(workIndex)[blockIndex];
     var placedBlock = buildAdvancedPlacedBlock(blockIndex, printedSteps, workIndex);
-    var justCompleted = printedSteps.length === ADVANCED_PRINT_STEPS.length &&
-      this.data.advancedPrintedSteps.length < ADVANCED_PRINT_STEPS.length;
+    var justCompleted = printedSteps.length === totalBlocks &&
+      this.data.advancedPrintedSteps.length < totalBlocks;
     this.setData({
       advancedPrintedSteps: printedSteps,
       advancedPreviewLayers: buildAdvancedPreviewLayers(printedSteps, workIndex),
@@ -1616,13 +1613,15 @@ Page({
   },
 
   onAdvancedPaperTap() {
-    if (this.data.advancedPrintedSteps.length === ADVANCED_PRINT_STEPS.length) {
+    var totalBlocks = this.data.advancedBlockCount || ADVANCED_PRINT_STEPS.length;
+    if (this.data.advancedPrintedSteps.length === totalBlocks) {
       this.openAdvancedPaperExplodedView();
     }
   },
 
   onAdvancedPaperTouchStart(e) {
-    if (this.data.advancedPrintedSteps.length === ADVANCED_PRINT_STEPS.length) return;
+    var totalBlocks = this.data.advancedBlockCount || ADVANCED_PRINT_STEPS.length;
+    if (this.data.advancedPrintedSteps.length === totalBlocks) return;
     if (!e.touches || !e.touches.length) return;
     this._advancedPaperStartX = e.touches[0].clientX;
     this._advancedPaperStartY = e.touches[0].clientY;
@@ -1664,7 +1663,8 @@ Page({
   },
 
   onAdvancedPaperTouchEnd() {
-    if (this.data.advancedPrintedSteps.length === ADVANCED_PRINT_STEPS.length) {
+    var totalBlocks = this.data.advancedBlockCount || ADVANCED_PRINT_STEPS.length;
+    if (this.data.advancedPrintedSteps.length === totalBlocks) {
       this.openAdvancedPaperExplodedView();
       return;
     }
@@ -1718,7 +1718,8 @@ Page({
   },
 
   openAdvancedPaperExplodedView() {
-    if (this.data.advancedPrintedSteps.length !== ADVANCED_PRINT_STEPS.length) return;
+    var totalBlocks = this.data.advancedBlockCount || ADVANCED_PRINT_STEPS.length;
+    if (this.data.advancedPrintedSteps.length !== totalBlocks) return;
     if (this.data.advancedWorkIndex >= ADVANCED_PRINT_SETS.length) {
       wx.navigateTo({ url: '/pages/exploded-view/exploded-view?showLatestUser=true' });
       return;
@@ -1735,13 +1736,19 @@ Page({
     this.setData({ advancedCreatorOpen: true });
   },
 
+  openAdvancedPhotoCreator() {
+    this.setData({ advancedCreatorOpen: true }, () => {
+      this.chooseAdvancedCreatorImage();
+    });
+  },
+
   _startCreatorWorking(stage) {
     clearInterval(this._creatorWorkingTimer);
     var messages = stage === 'generating'
       ? ['小年正在起稿构图', '正在铺设朱红与石黄', '正在补上青绿与墨线', '正在检查色块边界']
       : stage === 'assembling'
-        ? ['小年正在装配 2.5D 木板', '正在把作品放入卷五']
-        : ['小年正在辨认四种套色', '正在清理渐变和综合色', '正在生成四块分色木板', '正在校准套印位置'];
+        ? ['小年正在装配 2.5D 雕版', '正在把四色木板装入卷五版台']
+        : ['正在保边去噪与宣纸留白分割', '正在提取松烟墨线主骨版', '正在量化朱红、石黄、青绿矿物色版', '正在连通域去杂点并校准套印位置'];
     var index = 0;
     this.setData({
       advancedCreatorStage: stage,
@@ -1750,7 +1757,7 @@ Page({
     this._creatorWorkingTimer = setInterval(() => {
       index = (index + 1) % messages.length;
       this.setData({ advancedCreatorWorkingText: messages[index] });
-    }, 2600);
+    }, 2200);
   },
 
   _stopCreatorWorking() {
@@ -1768,24 +1775,36 @@ Page({
     this.setData({ advancedCreatorInput: e.detail.value });
   },
 
+  selectAdvancedCreatorPlateCount(e) {
+    if (this.data.advancedCreatorGenerating || this.data.advancedCreatorSplitting) return;
+    var count = e.currentTarget.dataset.count || 'auto';
+    this._cachedCreatorSplitResult = null;
+    this.setData({ advancedCreatorPlateCount: count });
+  },
+
   chooseAdvancedCreatorImage() {
     if (this.data.advancedCreatorGenerating || this.data.advancedCreatorSplitting) return;
     wx.chooseMedia({
       count: 1,
       mediaType: ['image'],
-      sourceType: ['album', 'camera'],
-      success: (res) => {
+      sourceType: ['camera', 'album'],
+      camera: 'front',
+      success: async (res) => {
         var file = res.tempFiles && res.tempFiles[0];
         if (!file || !file.tempFilePath) return;
+        var compressedPath = await compressLocalImage(file.tempFilePath, 80);
+        this._cachedCreatorSplitResult = null;
+        this._rawPhotoCreatorPath = compressedPath;
         this.setData({
-          advancedCreatorImage: file.tempFilePath,
-          advancedCreatorFileID: ''
+          advancedCreatorImage: compressedPath,
+          advancedCreatorFileID: '',
+          advancedCreatorSourceType: 'photo'
         });
       }
     });
   },
 
-  generateAdvancedCreatorImage() {
+  async generateAdvancedCreatorImage() {
     var input = String(this.data.advancedCreatorInput || '').trim();
     if (!input) {
       wx.showToast({ title: '请先输入创作主题', icon: 'none' });
@@ -1794,48 +1813,106 @@ Page({
     if (this.data.advancedCreatorGenerating || this.data.advancedCreatorSplitting) return;
 
     var promptConfig = buildNianhuaImagePrompt(input);
+    this._cachedCreatorSplitResult = null;
 
     this.setData({
       advancedCreatorGenerating: true,
       advancedCreatorImage: '',
-      advancedCreatorFileID: ''
+      advancedCreatorFileID: '',
+      advancedCreatorSourceType: 'ai'
     });
     this._startCreatorWorking('generating');
 
-    wx.cloud.callFunction({
-      name: 'generateImage-PBKj5J',
-      data: {
+    try {
+      var result = await requestNianhuaImageGeneration({
         prompt: promptConfig.prompt,
-        negative_prompt: promptConfig.negativePrompt,
-        model: 'hunyuan-image',
-        version: 'v1.9',
-        size: '1024x1024',
-        n: 1,
-        revise: false
-      },
-      success: (res) => {
-        var result = res.result || {};
-        if (result.success && (result.fileID || result.imageUrl)) {
-          this.setData({
-            advancedCreatorImage: result.imageUrl || result.fileID,
-            advancedCreatorFileID: result.fileID || '',
-            advancedCreatorGenerating: false
-          });
-          this._stopCreatorWorking();
-          return;
-        }
-        console.error('[卷五二创] 生图返回异常:', result);
-        wx.showToast({ title: '生成失败，请重试', icon: 'none' });
-        this.setData({ advancedCreatorGenerating: false });
-        this._stopCreatorWorking();
-      },
-      fail: (err) => {
-        console.error('[卷五二创] 生图调用失败:', err);
-        wx.showToast({ title: '生成失败，请重试', icon: 'none' });
-        this.setData({ advancedCreatorGenerating: false });
-        this._stopCreatorWorking();
-      }
-    });
+        negativePrompt: promptConfig.negativePrompt
+      });
+      this.setData({
+        advancedCreatorImage: result.imageUrl || result.fileID,
+        advancedCreatorFileID: result.fileID || '',
+        advancedCreatorSourceType: 'ai',
+        advancedCreatorGenerating: false
+      });
+    } catch (err) {
+      console.error('[卷五二创] 生图调用失败:', err);
+      wx.showToast({ title: '生成失败，请重试', icon: 'none' });
+      this.setData({ advancedCreatorGenerating: false });
+    } finally {
+      this._stopCreatorWorking();
+    }
+  },
+
+  async redrawPhotoAsNianhua() {
+    if (!this.data.advancedCreatorImage || this.data.advancedCreatorGenerating || this.data.advancedCreatorSplitting) return;
+    var requestedCount = this.data.advancedCreatorPlateCount === 'auto'
+      ? 'auto'
+      : Number(this.data.advancedCreatorPlateCount) || 'auto';
+
+    this.setData({ advancedCreatorGenerating: true });
+    this._startCreatorWorking('generating');
+
+    try {
+      var sourcePath = this._rawPhotoCreatorPath || this.data.advancedCreatorImage;
+      var stylized = await stylizePhotoToWoodblockNianhua(sourcePath, {
+        removeBackground: true,
+        maxColors: requestedCount
+      });
+      this._cachedCreatorSplitResult = stylized.splitResult || null;
+      this.setData({
+        advancedCreatorImage: stylized.imageUrl,
+        advancedCreatorFileID: '',
+        advancedCreatorSourceType: 'photo',
+        advancedCreatorGenerating: false
+      });
+      wx.showToast({ title: '已转为' + (stylized.plateCount || 4) + '色木版画风格', icon: 'success' });
+    } catch (err) {
+      console.error('[卷五二创] 实拍图转木版画风格失败:', String(err && (err.stack || err.message || err.errMsg || err)));
+      wx.showToast({ title: '风格化失败，可直接点生成雕版', icon: 'none' });
+      this.setData({ advancedCreatorGenerating: false });
+    } finally {
+      this._stopCreatorWorking();
+    }
+  },
+
+  async redrawPhotoAsAnimeNianhua() {
+    if (!this.data.advancedCreatorImage || this.data.advancedCreatorGenerating || this.data.advancedCreatorSplitting) return false;
+    this.setData({ advancedCreatorGenerating: true });
+    this._startCreatorWorking('generating');
+    this.setData({ advancedCreatorWorkingText: '正在识别自拍特征并生成二次元国潮年画...' });
+
+    try {
+      var sourcePath = this._rawPhotoCreatorPath || this.data.advancedCreatorImage;
+      var animeRes = await generateAnimeNianhuaFromPhoto(sourcePath, {
+        userHint: this.data.advancedCreatorInput
+      });
+      this._cachedCreatorSplitResult = null;
+      this.setData({
+        advancedCreatorImage: animeRes.imageUrl || animeRes.fileID,
+        advancedCreatorFileID: animeRes.fileID || '',
+        advancedCreatorSourceType: 'ai',
+        advancedCreatorGenerating: false,
+        advancedCreatorInput: this.data.advancedCreatorInput || '自拍二次元国潮年画'
+      });
+      wx.showToast({ title: '二次元年画生成成功', icon: 'success' });
+      return true;
+    } catch (err) {
+      console.error('[卷五二创] 自拍转二次元年画失败:', String(err && (err.stack || err.message || err.errMsg || err)));
+      wx.showToast({ title: 'AI重绘超时，已切换刀刻风格化', icon: 'none' });
+      this.setData({ advancedCreatorGenerating: false });
+      await this.redrawPhotoAsNianhua();
+      return true;
+    } finally {
+      this._stopCreatorWorking();
+    }
+  },
+
+  async selfieToAnimeAndSplit() {
+    if (!this.data.advancedCreatorImage || this.data.advancedCreatorGenerating || this.data.advancedCreatorSplitting) return;
+    var ok = await this.redrawPhotoAsAnimeNianhua();
+    if (ok && this.data.advancedCreatorImage) {
+      await this.splitAdvancedCreatorImage();
+    }
   },
 
   async splitAdvancedCreatorImage() {
@@ -1844,52 +1921,69 @@ Page({
     this._startCreatorWorking('splitting');
 
     try {
-      var imageSource = await this._prepareAdvancedCreatorImage();
-      var result = await this._requestAdvancedCreatorSplit(imageSource);
-      var record = await this._saveAdvancedCreatorLayers(result.layers || []);
-      if (!record) throw new Error('分色结果为空');
-      record.original = result.quantizedFileID || this.data.advancedCreatorFileID || this.data.advancedCreatorImage;
+      var isPhoto = this.data.advancedCreatorSourceType === 'photo';
+      var requestedCount = this.data.advancedCreatorPlateCount === 'auto'
+        ? 'auto'
+        : Number(this.data.advancedCreatorPlateCount) || 'auto';
+      var result = this._cachedCreatorSplitResult;
+      if (!result) {
+        var imageSource = await this._prepareAdvancedCreatorImage();
+        result = await requestSplitColors(imageSource, {
+          photoMode: isPhoto ? 'photo' : 'auto',
+          removeBackground: true,
+          maxColors: requestedCount,
+          flattenPalette: true
+        });
+      }
+      this._cachedCreatorSplitResult = null;
 
-      var currentList = wx.getStorageSync('userColorLayers');
-      var list = Array.isArray(currentList) ? currentList : [];
-      wx.setStorageSync('userColorLayers', [record].concat(list.filter(function(item) {
-        return item && item.id !== record.id;
-      })).slice(0, 10));
+      var defaultTitle = isPhoto
+        ? (String(this.data.advancedCreatorInput || '').trim() || '实拍木版年画')
+        : (String(this.data.advancedCreatorInput || '').trim() || 'AI 年画二创');
+
+      var saved = saveWorkToDualStores(result, {
+        title: defaultTitle,
+        mode: isPhoto ? 'photo' : 'flat',
+        sourceFileID: this.data.advancedCreatorFileID,
+        sourceImage: this.data.advancedCreatorImage
+      });
 
       this._startCreatorWorking('assembling');
-      await new Promise(function(resolve) { setTimeout(resolve, 700); });
-      var workIndex = this._addAdvancedUserWork(record);
+      await new Promise(function(resolve) { setTimeout(resolve, 550); });
+      this._loadAdvancedUserWorks();
+      var workIndex = runtimeAdvancedPrintSets.findIndex(function(item) {
+        return item && item.id === saved.advancedWork.id;
+      });
       this.setData({ advancedCreatorOpen: false });
       if (workIndex > -1) {
         this.switchAdvancedWork({ currentTarget: { dataset: { index: workIndex } } });
-        wx.showToast({ title: '已加入作品切换', icon: 'success' });
+        wx.showToast({ title: (saved.advancedWork.steps.length || 4) + '块雕版已装入版台', icon: 'success' });
       }
     } catch (err) {
       console.error('[卷五二创] 分色失败:', err);
-      wx.showToast({ title: '分色失败，请重试', icon: 'none' });
+      wx.showToast({ title: (err && err.message) || '分色失败，请重试', icon: 'none' });
     } finally {
       this._stopCreatorWorking();
       this.setData({ advancedCreatorSplitting: false });
     }
   },
 
-  _prepareAdvancedCreatorImage() {
+  async _prepareAdvancedCreatorImage() {
     if (this.data.advancedCreatorFileID) {
-      return Promise.resolve(this.data.advancedCreatorFileID);
+      return this.data.advancedCreatorFileID;
     }
 
     var filePath = this.data.advancedCreatorImage;
-    if (!filePath || filePath.startsWith('cloud://')) {
-      return Promise.resolve(filePath);
+    if (!filePath || filePath.startsWith('cloud://') || filePath.startsWith('data:image/')) {
+      return filePath;
     }
 
     if (/^https?:\/\//i.test(filePath)) {
-      return this._downloadAdvancedCreatorImage(filePath).then((tempFilePath) => {
-        return this._uploadAdvancedCreatorSource(tempFilePath);
-      });
+      var tempFilePath = await this._downloadAdvancedCreatorImage(filePath);
+      return this._uploadOrEncodeCreatorSource(tempFilePath);
     }
 
-    return this._uploadAdvancedCreatorSource(filePath);
+    return this._uploadOrEncodeCreatorSource(filePath);
   },
 
   _downloadAdvancedCreatorImage(url) {
@@ -1911,87 +2005,15 @@ Page({
     });
   },
 
-  _uploadAdvancedCreatorSource(filePath) {
-    var cloudPath = 'user-creation/source/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
-    return new Promise((resolve, reject) => {
-      wx.cloud.uploadFile({
-        cloudPath: cloudPath,
-        filePath: filePath,
-        success: (res) => {
-          this.setData({ advancedCreatorFileID: res.fileID || '' });
-          resolve(res.fileID);
-        },
-        fail: function(err) {
-          reject(new Error((err && err.errMsg) || '原图上传云端失败'));
-        }
-      });
-    });
-  },
-
-  _requestAdvancedCreatorSplit(imageSource) {
-    return new Promise(function(resolve, reject) {
-      wx.cloud.callFunction({
-        name: 'splitColors',
-        data: {
-          image: imageSource,
-          imageBase64: imageSource,
-          imageUrl: imageSource,
-          removeBackground: true,
-          maxColors: 4,
-          palette: ['#191512', '#c93434', '#e7b82f', '#2f7a61'],
-          paletteLabels: ['墨黑色版', '朱红色版', '石黄色版', '青绿色版'],
-          flattenPalette: true
-        },
-        success: function(res) {
-          var result = res.result || {};
-          if (result.success && Array.isArray(result.layers)) {
-            resolve(result);
-            return;
-          }
-          reject(new Error(result.error || result.message || '云函数分色失败'));
-        },
-        fail: reject
-      });
-    });
-  },
-
-  async _saveAdvancedCreatorLayers(layers) {
-    var fs = wx.getFileSystemManager();
-    var timestamp = Date.now();
-    var id = 'user_' + timestamp;
-    var savedLayers = [];
-
-    for (var i = 0; i < layers.length; i++) {
-      var layer = layers[i];
-      if (layer.fileID) {
-        savedLayers.push({
-          tempPath: layer.fileID,
-          fileID: layer.fileID,
-          color: layer.color || '',
-          label: layer.label || ('图层' + (i + 1))
-        });
-        continue;
-      }
-
-      var base64Data = String(layer.data || layer.base64 || '').replace(/^data:image\/\w+;base64,/, '');
-      if (!base64Data) continue;
-      var tempPath = wx.env.USER_DATA_PATH + '/user_layer_' + id + '_' + i + '.png';
-      fs.writeFileSync(tempPath, wx.base64ToArrayBuffer(base64Data), 'binary');
-      savedLayers.push({
-        tempPath: tempPath,
-        color: layer.color || '',
-        label: layer.label || ('图层' + (i + 1))
-      });
+  async _uploadOrEncodeCreatorSource(filePath) {
+    try {
+      var fileID = await uploadSourceImageToCloud(filePath, 'user-creation/source');
+      this.setData({ advancedCreatorFileID: fileID || '' });
+      return fileID;
+    } catch (uploadErr) {
+      console.warn('[卷五二创] 云端上传不可用，降级为本地 Base64 直传:', uploadErr);
+      return readLocalFileAsDataUrl(filePath);
     }
-
-    if (!savedLayers.length) return null;
-    return {
-      id: id,
-      title: String(this.data.advancedCreatorInput || '').trim() || '数字二创作品',
-      isPreset: false,
-      layers: savedLayers,
-      timestamp: timestamp
-    };
   },
 
   // 兼容旧版自动演示

@@ -111,10 +111,6 @@
         "type": "folder"
       },
       {
-        "value": "cloudfunctions",
-        "type": "folder"
-      },
-      {
         "value": "rules",
         "type": "folder"
       },
@@ -282,7 +278,7 @@
     "checkInvalidKey": true,
     "checkSiteMap": true,
     "uploadWithSourceMap": true,
-    "compileHotReLoad": false,
+    "compileHotReLoad": true,
     "lazyloadPlaceholderEnable": false,
     "useMultiFrameRuntime": true,
     "useApiHook": true,
@@ -318,5 +314,6 @@
     "tabSize": 2
   },
   "simulatorPluginLibVersion": {},
+  "cloudfunctionRoot": "cloudfunctions/",
   "cloudfunctionTemplateRoot": "cloudfunctionTemplate/"
 }

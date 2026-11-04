@@ -46,6 +46,40 @@ function buildNianhuaImagePrompt(subject) {
   return { prompt, negativePrompt };
 }
 
+/**
+ * 构造「自拍/实拍图 -> 国潮二次元平涂木版年画」专属提示词
+ * 将多模态视觉模型识别出的人物发型、配饰、神态、服装色系融合进二次元赛璐璐+佛山木版年画平涂风格
+ */
+function buildAnimeNianhuaPrompt(visionTraits, userHint) {
+  const cleanTraits = String(visionTraits || '').trim() || '青年人物半身像，面带微笑，神态喜庆精神';
+  const extraHint = String(userHint || '').trim();
+  const prompt = [
+    '创作一幅国潮二次元动漫插画风格的佛山木版年画人物半身像。',
+    '画中主角外貌与动作严格还原以下特征：' + cleanTraits + (extraHint ? ('，主题氛围：' + extraHint) : '') + '。',
+    '采用精致灵动的二次元动漫五官开相与日式赛璐璐（Cel-shading）硬边平涂上色，融合佛山非遗木版年画的粗犷刀刻松烟墨黑勾线、金鳞祥云与岭南喜庆装饰。',
+    '画面必须使用高饱和纯色色块平涂：万年红（朱砂红）、石黄（明黄）、石绿（翠青）、靛青蓝、松烟墨黑，并保留干净的宣纸米白背景。',
+    '每个封闭区域只能填充完全均匀的单一纯色，颜色交界硬朗分明，严禁出现写实摄影渐变、柔和阴影、3D模糊过渡或杂乱噪点，确保完美适合直接拆分为多块套印木版。'
+  ].join('');
+
+  const negativePrompt = [
+    '真人写实摄影',
+    '照片感',
+    '黑白画',
+    '灰度图',
+    '3D写实渲染',
+    '柔和渐变',
+    '复杂阴影过渡',
+    '模糊边缘',
+    '恐怖畸形五官',
+    '多余手指',
+    '文字水印',
+    '暗沉脏色背景'
+  ].join(', ');
+
+  return { prompt, negativePrompt };
+}
+
 module.exports = {
-  buildNianhuaImagePrompt
+  buildNianhuaImagePrompt,
+  buildAnimeNianhuaPrompt
 };

@@ -302,15 +302,23 @@
             <text class="screen-label">版 台</text>
             <text class="screen-heading">分色木板</text>
           </view>
+          <view class="advanced-header-actions">
+            <view class="advanced-quick-btn advanced-quick-btn-camera" bindtap="openAdvancedPhotoCreator">
+              <text class="advanced-quick-btn-text">拍照制版</text>
+            </view>
+            <view class="advanced-quick-btn" bindtap="openAdvancedCreator">
+              <text class="advanced-quick-btn-text">AI 二创</text>
+            </view>
+          </view>
         </view>
 
         <view class="advanced-source-strip">
           <image class="advanced-source-image" src="{{advancedCurrentWork.original}}" mode="aspectFit"></image>
           <view class="advanced-source-copy">
             <text class="advanced-source-label">当前原画</text>
-            <text class="advanced-source-name">{{advancedCurrentWork.name}} · 一画四版</text>
+            <text class="advanced-source-name">{{advancedCurrentWork.name}} · 一画{{advancedBlockCount}}版</text>
           </view>
-          <text class="advanced-source-count">{{advancedPrintedSteps.length}} / 4</text>
+          <text class="advanced-source-count">{{advancedPrintedSteps.length}} / {{advancedBlockCount}}</text>
         </view>
 
         <view class="advanced-stage {{advancedWorkIndex===1?'advanced-stage-set2':''}}">
@@ -325,7 +333,7 @@
                 </text>
               </view>
             </view>
-            <view class="advanced-board-slot {{advancedPlacedBlock ? 'advanced-slot-filled' : ''}}" bindtap="viewAdvancedBlock3D">
+            <view class="advanced-board-slot {{advancedPlacedBlock ? 'advanced-slot-filled' : ''}} {{advancedCurrentWork.isUserCreated && advancedPlacedBlock ? 'advanced-user-woodblock-surface' : ''}}" bindtap="viewAdvancedBlock3D">
               <image
                 wx:if="{{advancedPlacedBlock}}"
                 class="advanced-board-img {{advancedBoardMoving ? 'advanced-board-moving' : ''}}"
@@ -387,7 +395,7 @@
           </view>
         </view>
 
-        <view class="advanced-board-tray">
+        <view class="advanced-board-tray {{advancedBlocks.length > 4 ? 'advanced-board-tray-multi' : ''}}">
           <view
             wx:for="{{advancedBlocks}}"
             wx:key="name"
@@ -396,7 +404,7 @@
             data-index="{{index}}"
             bindtap="selectAdvancedBlock"
           >
-            <view class="advanced-thumb-frame">
+            <view class="advanced-thumb-frame {{advancedCurrentWork.isUserCreated ? 'advanced-user-woodblock-surface' : ''}}">
               <view class="advanced-thumb-turn advanced-thumb-turn-{{index}}">
                 <image class="advanced-thumb-img advanced-thumb-depth advanced-thumb-depth-back" src="{{item.boardImage}}" mode="aspectFit"></image>
                 <image class="advanced-thumb-img advanced-thumb-depth advanced-thumb-depth-mid" src="{{item.boardImage}}" mode="aspectFit"></image>
@@ -424,15 +432,15 @@
 
         <view class="volume-five-experiences">
           <view class="volume-five-heading">
-            <text class="volume-five-kicker">版外观摩</text>
-            <text class="volume-five-title">从木板走进数字展厅</text>
+            <text class="volume-five-kicker">版外观摩 · 实拍制版</text>
+            <text class="volume-five-title">从实拍照片或 AI 走向木版套印</text>
           </view>
           <view class="volume-five-actions">
             <view class="volume-five-action volume-five-action-wide" bindtap="openAdvancedCreator">
               <view class="volume-five-action-mark">创</view>
               <view class="volume-five-action-copy">
-                <text class="volume-five-action-title">AI 数字二创</text>
-                <text class="volume-five-action-desc">在当前卷上传原图或 AI 生成，再进入分色展厅</text>
+                <text class="volume-five-action-title">拍照转年画 & AI 数字二创</text>
+                <text class="volume-five-action-desc">支持拍照/相册实拍图直转四色雕版，或 AI 主题生图装入卷五</text>
               </view>
               <text class="volume-five-action-arrow">›</text>
             </view>
@@ -748,27 +756,49 @@
     <view class="advanced-creator-panel" catchtap="noop">
       <view class="advanced-creator-head">
         <view>
-          <text class="advanced-creator-kicker">卷五 · 数字二创</text>
-          <text class="advanced-creator-title">生成你的四色年画</text>
+          <text class="advanced-creator-kicker">卷五 · 实拍制版与数字二创</text>
+          <text class="advanced-creator-title">拍照转年画 / 动态多色雕版</text>
         </view>
         <view class="advanced-creator-close" bindtap="closeAdvancedCreator">×</view>
       </view>
-      <text class="advanced-creator-notice">AI 生成内容仅作数字创作展示</text>
+      <text class="advanced-creator-notice">突破固定四版限制：支持根据实拍图/画作色相自动激活 3~6 块佛山传统矿物雕版（墨、红、黄、绿、蓝、橙、紫、赭等）</text>
       <textarea
         class="advanced-creator-input"
         value="{{advancedCreatorInput}}"
-        placeholder="输入主题，如醒狮、门神、岭南花鸟"
+        placeholder="输入作品名或 AI 创作主题，如：醒狮纳福、秦琼尉迟恭、岭南花鸟"
         maxlength="80"
         bindinput="onAdvancedCreatorInput"
         disabled="{{advancedCreatorGenerating || advancedCreatorSplitting}}"
       />
+      <view class="advanced-creator-plate-selector">
+        <text class="advanced-creator-plate-label">雕版数量：</text>
+        <view class="advanced-creator-plate-pills">
+          <view class="advanced-plate-pill {{advancedCreatorPlateCount==='auto'?'advanced-plate-pill-active':''}}" data-count="auto" bindtap="selectAdvancedCreatorPlateCount">智能自适应(3-6版)</view>
+          <view class="advanced-plate-pill {{advancedCreatorPlateCount==='4'?'advanced-plate-pill-active':''}}" data-count="4" bindtap="selectAdvancedCreatorPlateCount">经典4版</view>
+          <view class="advanced-plate-pill {{advancedCreatorPlateCount==='5'?'advanced-plate-pill-active':''}}" data-count="5" bindtap="selectAdvancedCreatorPlateCount">五色5版</view>
+          <view class="advanced-plate-pill {{advancedCreatorPlateCount==='6'?'advanced-plate-pill-active':''}}" data-count="6" bindtap="selectAdvancedCreatorPlateCount">全彩6版</view>
+        </view>
+      </view>
       <view class="advanced-creator-commands">
-        <button class="advanced-creator-btn advanced-creator-btn-secondary" bindtap="chooseAdvancedCreatorImage" disabled="{{advancedCreatorGenerating || advancedCreatorSplitting}}">上传原图</button>
-        <button class="advanced-creator-btn advanced-creator-btn-primary" bindtap="generateAdvancedCreatorImage" disabled="{{advancedCreatorGenerating || advancedCreatorSplitting}}">AI 生成年画</button>
+        <button class="advanced-creator-btn advanced-creator-btn-secondary" bindtap="chooseAdvancedCreatorImage" disabled="{{advancedCreatorGenerating || advancedCreatorSplitting}}">自拍 / 选相册图</button>
+        <button class="advanced-creator-btn advanced-creator-btn-primary" bindtap="generateAdvancedCreatorImage" disabled="{{advancedCreatorGenerating || advancedCreatorSplitting}}">AI 主题生图</button>
       </view>
       <view wx:if="{{advancedCreatorImage}}" class="advanced-creator-result">
+        <view class="advanced-creator-source-badge">
+          <text>{{advancedCreatorSourceType === 'photo' ? '自拍/实拍原图 · 支持 AI 二次元国潮年画化或 1:1 刀刻木版直转' : 'AI 二次元年画底稿 · 支持自适应多色木版拆解'}}</text>
+        </view>
         <image class="advanced-creator-image" src="{{advancedCreatorImage}}" mode="aspectFit"></image>
-        <button class="advanced-creator-split" bindtap="splitAdvancedCreatorImage" disabled="{{advancedCreatorGenerating || advancedCreatorSplitting}}">生成四色分版并加入卷五</button>
+        <view class="advanced-creator-split-group">
+          <button wx:if="{{advancedCreatorSourceType === 'photo'}}" class="advanced-creator-split" bindtap="selfieToAnimeAndSplit" disabled="{{advancedCreatorGenerating || advancedCreatorSplitting}}">
+            一键 AI 二次元年画化 + 自动分色装台
+          </button>
+          <button class="{{advancedCreatorSourceType === 'photo' ? 'advanced-creator-btn advanced-creator-btn-secondary advanced-creator-redraw-btn' : 'advanced-creator-split'}}" bindtap="splitAdvancedCreatorImage" disabled="{{advancedCreatorGenerating || advancedCreatorSplitting}}">
+            {{advancedCreatorPlateCount === 'auto' ? '直接拆解多色木版并装入卷五' : ('直接拆解为 ' + advancedCreatorPlateCount + ' 块木版并装入卷五')}}
+          </button>
+          <button wx:if="{{advancedCreatorSourceType === 'photo'}}" class="advanced-creator-btn advanced-creator-btn-secondary advanced-creator-redraw-btn" bindtap="redrawPhotoAsNianhua" disabled="{{advancedCreatorGenerating || advancedCreatorSplitting}}">
+            1:1 保构图刀刻版画预览（不调AI）
+          </button>
+        </view>
       </view>
       <view wx:if="{{advancedCreatorGenerating || advancedCreatorSplitting}}" class="advanced-creator-working">
         <view class="advanced-working-scene">
@@ -782,7 +812,7 @@
           </view>
         </view>
         <text class="advanced-working-title">{{advancedCreatorWorkingText}}</text>
-        <text class="advanced-working-sub">{{advancedCreatorStage==='generating'?'四色年画正在云端绘制，请稍候':(advancedCreatorStage==='assembling'?'木板即将放入作品切换栏':'正在量化为墨、朱红、石黄、青绿')}}</text>
+        <text class="advanced-working-sub">{{advancedCreatorStage==='generating'?'正在提取刀刻墨线与矿物平涂色块':(advancedCreatorStage==='assembling'?'多色雕版即将放入卷五版台':'正在动态拆解松烟墨与矿物色版')}}</text>
         <view class="advanced-working-progress">
           <view class="advanced-working-progress-fill"></view>
         </view>
