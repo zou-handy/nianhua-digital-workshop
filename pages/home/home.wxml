@@ -8,24 +8,6 @@
   <view class="global-paper-grain" aria-hidden="true"></view>
   <view class="global-overlay"></view>
 
-  <video
-    wx:if="{{currentPage === 0 && openingEffectVisible && openingEffectUrl}}"
-    id="openingWelcomeVideo"
-    class="opening-effect-video {{openingEffectPlaying ? 'is-playing' : ''}}"
-    src="{{openingEffectUrl}}"
-    autoplay
-    muted
-    controls="{{false}}"
-    object-fit="contain"
-    show-play-btn="{{false}}"
-    show-center-play-btn="{{false}}"
-    show-mute-btn="{{false}}"
-    enable-progress-gesture="{{false}}"
-    bindplay="onOpeningEffectPlay"
-    bindended="onOpeningEffectEnded"
-    binderror="onOpeningEffectError"
-  ></video>
-
   <view wx:if="{{volumeTransitionActive}}" class="volume-transition" aria-hidden="true">
     <view class="volume-transition-ink"></view>
     <view class="volume-transition-vermilion"></view>
@@ -76,20 +58,52 @@
           class="s1-print-stage"
           bindtap="replayOpeningPrint"
         >
-          <view wx:if="{{openingPrintVisible}}" class="s1-print-inner s1-print-running">
+          <view wx:if="{{openingPrintVisible}}" class="s1-print-inner s1-print-running {{openingEffectPlaying ? 's1-awakening-active' : ''}}">
+            <view class="s1-aura-halo {{openingEffectPlaying ? 'is-active' : ''}}" aria-hidden="true"></view>
             <view class="s1-board-back"></view>
-            <view class="s1-paper">
+            <view class="s1-paper {{openingEffectPlaying ? 's1-paper-awakened' : ''}}">
               <view class="s1-paper-fiber"></view>
+              <view class="s1-gold-corners {{openingEffectPlaying ? 'is-active' : ''}}" aria-hidden="true">
+                <view class="s1-corner s1-corner-tl"></view>
+                <view class="s1-corner s1-corner-tr"></view>
+                <view class="s1-corner s1-corner-bl"></view>
+                <view class="s1-corner s1-corner-br"></view>
+              </view>
               <image
                 wx:for="{{openingLayers}}"
                 wx:key="id"
-                class="s1-print-layer"
+                class="s1-print-layer s1-layer-{{index}}"
                 src="{{item.src}}"
                 mode="aspectFit"
                 style="z-index:{{item.zIndex}}; animation-delay:{{item.delay}}ms;"
               ></image>
               <view class="s1-ink-sweep"></view>
-              <view class="s1-print-seal">
+              <view class="s1-gold-sheen {{openingEffectPlaying ? 'is-active' : ''}}" aria-hidden="true"></view>
+              <view class="s1-code-awakening {{openingEffectPlaying ? 'is-active' : ''}}" aria-hidden="true">
+                <view class="s1-code-core-glow"></view>
+                <view class="s1-code-ripple s1-ripple-1"></view>
+                <view class="s1-code-ripple s1-ripple-2"></view>
+                <view class="s1-code-ripple s1-ripple-3"></view>
+                <view class="s1-code-orbit s1-orbit-a">
+                  <view class="s1-orbit-comet"></view>
+                </view>
+                <view class="s1-code-orbit s1-orbit-b">
+                  <view class="s1-orbit-comet"></view>
+                </view>
+                <view class="s1-code-spark s1-spark-1 is-gold"></view>
+                <view class="s1-code-spark s1-spark-2 is-red"></view>
+                <view class="s1-code-spark s1-spark-3 is-gold"></view>
+                <view class="s1-code-spark s1-spark-4 is-gold"></view>
+                <view class="s1-code-spark s1-spark-5 is-red"></view>
+                <view class="s1-code-spark s1-spark-6 is-gold"></view>
+                <view class="s1-code-spark s1-spark-7 is-gold"></view>
+                <view class="s1-code-spark s1-spark-8 is-red"></view>
+              </view>
+              <view class="s1-stage-badge {{openingStageBadge ? 'is-visible' : ''}} {{openingEffectPlaying ? 'is-gold' : ''}}">
+                <view class="s1-stage-badge-dot"></view>
+                <text class="s1-stage-badge-text">{{openingStageBadge}}</text>
+              </view>
+              <view class="s1-print-seal {{openingEffectPlaying ? 'is-awakened' : ''}}">
                 <text class="s1-print-seal-text">印</text>
               </view>
             </view>
@@ -97,7 +111,7 @@
               <view
                 wx:for="{{openingLayers}}"
                 wx:key="id"
-                class="s1-process-step"
+                class="s1-process-step {{openingActiveStep >= index ? 'is-lit' : ''}}"
                 style="animation-delay:{{item.delay}}ms;"
               >
                 <view class="s1-process-dot" style="background:{{item.color}};"></view>

@@ -112,7 +112,7 @@ function requestSplitColorsViaCloudFunction(payload) {
   });
 }
 
-function purgeStaleUserFiles(aggressive = false) {
+function purgeStaleUserFiles(aggressive = false, keepToken = '') {
   try {
     const fs = wx.getFileSystemManager();
     const root = wx.env.USER_DATA_PATH;
@@ -120,6 +120,7 @@ function purgeStaleUserFiles(aggressive = false) {
     for (let i = 0; i < entries.length; i++) {
       const name = entries[i];
       if (!name || name === 'miniprogramLog') continue;
+      if (keepToken && name.indexOf(keepToken) > -1) continue;
       const fullPath = `${root}/${name}`;
       try {
         const stat = fs.statSync(fullPath);
@@ -131,29 +132,33 @@ function purgeStaleUserFiles(aggressive = false) {
         }
         if (
           aggressive ||
-          /^edge_src_|^stylized_nianhua_|^quantized_|^user_layer_|\.(glb|gltf|bin|tmp)$/i.test(name)
+          /^edge_src_|^selfie_|^probe_|^stylized_nianhua_|^quantized_|^user_layer_|\.(glb|gltf|bin|tmp)$/i.test(name)
         ) {
           fs.unlinkSync(fullPath);
         }
-      } catch (e) {}
+      } catch (e) {
+        if (aggressive) {
+          try { fs.unlinkSync(fullPath); } catch (e2) {}
+        }
+      }
     }
   } catch (err) {
     console.warn('[nianhuaPipeline] 清理 USER_DATA_PATH 缓存警告:', err);
   }
 }
 
-function writeUserFileSafe(filePath, arrayBuffer) {
+function writeUserFileSafe(filePath, arrayBuffer, keepToken = '') {
   const fs = wx.getFileSystemManager();
   try {
     fs.writeFileSync(filePath, arrayBuffer);
     return filePath;
   } catch (err) {
-    purgeStaleUserFiles(false);
+    purgeStaleUserFiles(false, keepToken);
     try {
       fs.writeFileSync(filePath, arrayBuffer);
       return filePath;
     } catch (err2) {
-      purgeStaleUserFiles(true);
+      purgeStaleUserFiles(true, keepToken);
       try {
         fs.writeFileSync(filePath, arrayBuffer);
         return filePath;
@@ -189,6 +194,22 @@ function resolveLocalImagePathForCanvas(imageSource) {
           }
         },
         fail: reject
+      });
+      return;
+    }
+    if (/^https?:\/\//i.test(src) && !/^http:\/\/(usr|tmp)\//i.test(src)) {
+      wx.getImageInfo({
+        src,
+        success: (res) => {
+          resolve((res && res.path) || src);
+        },
+        fail: () => {
+          wx.downloadFile({
+            url: src,
+            success: (dl) => resolve((dl && dl.tempFilePath) || src),
+            fail: () => resolve(src)
+          });
+        }
       });
       return;
     }
@@ -289,10 +310,60 @@ async function runEdgeWoodblockSplit(imageSource, payload = {}) {
 }
 
 /**
- * 1:1 保构图实拍图转木版年画风格（真·图生图刀刻平涂重绘）
- * 严格保留实拍图的山水/建筑/人物构图，转化为宣纸底 + 松烟墨刀刻线 + 3~6 色矿物平涂版画图
+ * 1:1 保构图实拍图转木版年画风格（优先调用混元 3.0 真·图生图 HY-Image-v3.0-I2I-ToB-v1.0.1，离线时无缝回退端侧刀刻平涂引擎）
+ * 严格保留实拍图的木雕/建筑/山水/人物构图，转化为宣纸底 + 松烟墨刀刻线 + 3~6 色矿物平涂版画图
  */
 async function stylizePhotoToWoodblockNianhua(imageSource, options = {}) {
+  try {
+    let fileID = '';
+    let httpsUrl = '';
+    if (typeof imageSource === 'string' && /^https?:\/\//i.test(imageSource) && !/^http:\/\/(usr|tmp)\//i.test(imageSource)) {
+      httpsUrl = imageSource;
+    } else if (typeof imageSource === 'string' && imageSource.startsWith('cloud://')) {
+      fileID = imageSource;
+    } else if (typeof imageSource === 'string' && imageSource.startsWith('data:image/')) {
+      const isPng = /^data:image\/png/i.test(imageSource);
+      const ext = isPng ? 'png' : 'jpg';
+      const b64 = imageSource.replace(/^data:image\/\w+;base64,/, '');
+      const tempPath = writeUserFileSafe(`${wx.env.USER_DATA_PATH}/i2i_src_${Date.now()}.${ext}`, wx.base64ToArrayBuffer(b64));
+      fileID = await uploadSourceImageToCloud(tempPath, 'user-creation/source');
+    } else if (imageSource) {
+      fileID = await uploadSourceImageToCloud(imageSource, 'user-creation/source');
+    }
+    if (fileID && !httpsUrl) {
+      httpsUrl = await resolveCloudTempHttpsUrl(fileID);
+    }
+    if (httpsUrl && wx.cloud && wx.cloud.extend && wx.cloud.extend.AI && wx.cloud.extend.AI.createImageModel) {
+      const imgModel = wx.cloud.extend.AI.createImageModel('hunyuan-image');
+      if (imgModel && imgModel.generateImageSubUrlConfig && imgModel.generateImageSubUrlConfig['hunyuan-image']) {
+        imgModel.generateImageSubUrlConfig['hunyuan-image']['HY-Image-v3.0-I2I-ToB-v1.0.1'] = 'images/ar/generations';
+      }
+      const i2iPrompt = '严格依据图中主体的构图、姿态与细节结构，1:1重绘为正统广东佛山木版年画平面套印版画。采用刚劲松烟墨黑线勾勒主体轮廓与衣纹肌理，使用高饱和万年红（朱砂红）、石黄（明黄）、石绿（翠青）、靛青蓝四色矿物颜料纯粹平涂，背景为干净平整的米白宣纸，去除摄影反光、阴影与背景杂物，每个色块边界硬朗清晰，完美适合木版分色套印。';
+      const i2iRes = await imgModel.generateImage({
+        model: 'HY-Image-v3.0-I2I-ToB-v1.0.1',
+        prompt: i2iPrompt,
+        size: options.size || '1024x1024',
+        revise: { value: true },
+        image_urls: [httpsUrl],
+        timeout: 120000
+      });
+      const outUrl = i2iRes && i2iRes.data && i2iRes.data[0] && i2iRes.data[0].url;
+      if (outUrl) {
+        return {
+          success: true,
+          mode: 'hy-image-3.0-i2i-woodblock',
+          imageUrl: outUrl,
+          localPath: outUrl,
+          fileID: fileID || '',
+          plateCount: options.maxColors || 'auto',
+          splitResult: null
+        };
+      }
+    }
+  } catch (aiErr) {
+    console.warn('[nianhuaPipeline] HY-Image-v3.0-I2I 1:1 年画化降级至端侧刀刻引擎:', aiErr);
+  }
+
   const splitResult = await runEdgeWoodblockSplit(imageSource, {
     removeBackground: options.removeBackground !== false,
     maxColors: options.maxColors || 'auto'
@@ -428,105 +499,232 @@ function readLocalFileAsDataUrl(filePath, mime = 'image/jpeg') {
 }
 
 /**
- * 调用云函数 generateImage-PBKj5J 生成或重绘四色年画（支持文生图与实拍参考图生图）
- * 兼容 requestNianhuaImageGeneration('醒狮', options) 与 requestNianhuaImageGeneration({ prompt, negativePrompt, sourceFileID })
+ * 将 cloud:// fileID 解析为公网临时 HTTPS 链接（供 HY-Image-v3.0-I2I-ToB-v1.0.1 与多模态识图使用）
  */
-function requestNianhuaImageGeneration(subjectOrOptions, maybeOptions = {}) {
+async function resolveCloudTempHttpsUrl(source) {
+  if (!source) return '';
+  if (/^https?:\/\//i.test(source)) return source;
+  if (String(source).startsWith('cloud://') && wx.cloud && wx.cloud.getTempFileURL) {
+    try {
+      const urlRes = await wx.cloud.getTempFileURL({ fileList: [source] });
+      const item = urlRes && urlRes.fileList && urlRes.fileList[0];
+      if (item && item.tempFileURL) return item.tempFileURL;
+    } catch (e) {
+      console.warn('[nianhuaPipeline] getTempFileURL 失败:', e);
+    }
+  }
+  return '';
+}
+
+/**
+ * 生成或重绘四色年画（优先使用微信小程序端原生 wx.cloud.extend.AI.createImageModel 直连小程序成长计划额度，无需云函数中转）
+ * - 图生图 (I2I): 优先调用 HY-Image-v3.0-I2I-ToB-v1.0.1 (传入 image_urls: [httpsUrl])，并自动兼容 3.5 新模型 hy-image-v3.5-preview
+ * - 文生图 (T2I): 优先调用 HY-Image-3.0-Plus-4090-Tob-v1.0，失败再降级至云函数 generateImage-PBKj5J
+ */
+async function requestNianhuaImageGeneration(subjectOrOptions, maybeOptions = {}) {
   const isObj = subjectOrOptions && typeof subjectOrOptions === 'object';
   const options = isObj ? subjectOrOptions : (maybeOptions || {});
   const cleanSubject = String((isObj ? options.subject : subjectOrOptions) || '').trim() || '佛山木版年画门神纳福';
   const builtPrompt = buildNianhuaImagePrompt(cleanSubject);
-  const finalPrompt = options.prompt || builtPrompt.prompt;
+  const finalPrompt = String(options.prompt || builtPrompt.prompt).slice(0, 490);
   const finalNegativePrompt = options.negativePrompt || options.negative_prompt || builtPrompt.negativePrompt;
+  const targetSize = options.size || '1024x1024';
 
-  return new Promise((resolve, reject) => {
-    wx.cloud.callFunction({
-      name: 'generateImage-PBKj5J',
-      data: {
-        prompt: finalPrompt,
-        negative_prompt: finalNegativePrompt,
-        model: 'hunyuan-image',
-        version: 'v1.9',
-        size: options.size || '1024x1024',
-        n: 1,
-        revise: false,
-        ...(options.sourceFileID ? { sourceFileID: options.sourceFileID } : {}),
-        ...(options.sourceImageUrl ? { sourceImageUrl: options.sourceImageUrl } : {})
-      },
-      success: (res) => {
-        const result = (res && res.result) || {};
-        if (result.success && (result.fileID || result.imageUrl)) {
-          resolve({
-            imageUrl: result.imageUrl || result.fileID,
-            fileID: result.fileID || '',
-            mode: result.mode || 't2i'
-          });
-          return;
+  const httpsRefUrl = await resolveCloudTempHttpsUrl(options.sourceImageUrl || options.sourceFileID);
+
+  // 1. 优先通过小程序基础库 wx.cloud.extend.AI.createImageModel 直接调用小程序成长计划生图资源包
+  if (wx.cloud && wx.cloud.extend && wx.cloud.extend.AI && wx.cloud.extend.AI.createImageModel) {
+    // 1A. 若有垫图 URL，优先调混元 3.0 真·图生图模型 HY-Image-v3.0-I2I-ToB-v1.0.1
+    if (httpsRefUrl) {
+      try {
+        const imageModel = wx.cloud.extend.AI.createImageModel('hunyuan-image');
+        if (imageModel && imageModel.generateImageSubUrlConfig && imageModel.generateImageSubUrlConfig['hunyuan-image']) {
+          imageModel.generateImageSubUrlConfig['hunyuan-image']['HY-Image-v3.0-I2I-ToB-v1.0.1'] = 'images/ar/generations';
+          imageModel.generateImageSubUrlConfig['hunyuan-image']['HY-Image-3.0-Plus-4090-Tob-v1.0'] = 'images/ar/generations';
         }
-        reject(new Error(result.message || result.error || 'AI 年画生成失败'));
-      },
-      fail: (err) => {
-        reject(new Error((err && err.errMsg) || 'AI 年画生成调用失败'));
+        const i2iRes = await imageModel.generateImage({
+          model: 'HY-Image-v3.0-I2I-ToB-v1.0.1',
+          prompt: finalPrompt,
+          size: targetSize,
+          revise: { value: true },
+          image_urls: [httpsRefUrl],
+          timeout: 120000
+        });
+        const url = i2iRes && i2iRes.data && i2iRes.data[0] && i2iRes.data[0].url;
+        if (url) {
+          return {
+            imageUrl: url,
+            fileID: '',
+            mode: 'hy-image-3.0-i2i'
+          };
+        }
+      } catch (i2iErr) {
+        console.warn('[nianhuaPipeline] HY-Image-v3.0-I2I-ToB-v1.0.1 直连降级，尝试 hy-image-v3.5-preview:', i2iErr);
       }
-    });
-  });
+
+      // 1B. 自动兼容 11月中旬/12月接替的 hy-image-v3.5-preview 图生图协议
+      try {
+        const cbImageModel = wx.cloud.extend.AI.createImageModel('cloudbase');
+        const v35Res = await cbImageModel.generateImage({
+          model: 'hy-image-v3.5-preview',
+          size: targetSize,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'text', text: finalPrompt },
+              { type: 'image_url', image_url: { url: httpsRefUrl } }
+            ]
+          }]
+        });
+        const v35Url = v35Res && v35Res.choices && v35Res.choices[0] && v35Res.choices[0].delta && v35Res.choices[0].delta.image && v35Res.choices[0].delta.image.url;
+        if (v35Url) {
+          return {
+            imageUrl: v35Url,
+            fileID: '',
+            mode: 'hy-image-3.5-i2i'
+          };
+        }
+      } catch (v35Err) {
+        console.warn('[nianhuaPipeline] hy-image-v3.5-preview I2I 暂未激活，转用 3.0 Plus 文生图:', v35Err);
+      }
+    }
+
+    // 1C. 小程序端直连 HY-Image-3.0-Plus-4090-Tob-v1.0 文生图（带提示词特征重绘）
+    try {
+      const imageModel = wx.cloud.extend.AI.createImageModel('hunyuan-image');
+      if (imageModel && imageModel.generateImageSubUrlConfig && imageModel.generateImageSubUrlConfig['hunyuan-image']) {
+        imageModel.generateImageSubUrlConfig['hunyuan-image']['HY-Image-3.0-Plus-4090-Tob-v1.0'] = 'images/ar/generations';
+      }
+      const t2iRes = await imageModel.generateImage({
+        model: 'HY-Image-3.0-Plus-4090-Tob-v1.0',
+        prompt: finalPrompt,
+        size: targetSize,
+        revise: { value: true },
+        timeout: 120000
+      });
+      const url = t2iRes && t2iRes.data && t2iRes.data[0] && t2iRes.data[0].url;
+      if (url) {
+        return {
+          imageUrl: url,
+          fileID: '',
+          mode: 'hy-image-3.0-plus-t2i'
+        };
+      }
+    } catch (t2iErr) {
+      console.warn('[nianhuaPipeline] HY-Image-3.0-Plus-4090-Tob-v1.0 直连降级至云函数:', t2iErr);
+    }
+  }
+
+  // 2. 保底降级：调用云函数 generateImage-PBKj5J（依次尝试 I2I -> 3.0-Plus -> hunyuan-image，自动容错未重部署的旧版云函数）
+  const cfModels = httpsRefUrl
+    ? ['HY-Image-v3.0-I2I-ToB-v1.0.1', 'HY-Image-3.0-Plus-4090-Tob-v1.0', 'hunyuan-image']
+    : ['HY-Image-3.0-Plus-4090-Tob-v1.0', 'hunyuan-image'];
+
+  let lastCfErr = null;
+  for (const mdl of cfModels) {
+    try {
+      const cfRes = await new Promise((resolve, reject) => {
+        wx.cloud.callFunction({
+          name: 'generateImage-PBKj5J',
+          data: {
+            prompt: finalPrompt,
+            negative_prompt: finalNegativePrompt,
+            model: mdl,
+            size: targetSize,
+            n: 1,
+            revise: { value: true },
+            ...(options.sourceFileID ? { sourceFileID: options.sourceFileID } : {}),
+            ...(httpsRefUrl ? { sourceImageUrl: httpsRefUrl } : {})
+          },
+          success: (res) => {
+            const result = (res && res.result) || {};
+            if (result.success && (result.fileID || result.imageUrl || result.originalImageUrl)) {
+              resolve({
+                imageUrl: result.fileID || result.imageUrl || result.originalImageUrl,
+                fileID: result.fileID || '',
+                originalImageUrl: result.originalImageUrl || '',
+                mode: result.mode || mdl
+              });
+              return;
+            }
+            reject(new Error(result.message || result.error || `云函数 ${mdl} 生成失败`));
+          },
+          fail: (err) => {
+            reject(new Error((err && err.errMsg) || `云函数 ${mdl} 调用失败`));
+          }
+        });
+      });
+      return cfRes;
+    } catch (err) {
+      lastCfErr = err;
+      console.warn(`[nianhuaPipeline] generateImage-PBKj5J (${mdl}) 切换下一候选:`, err && err.message);
+    }
+  }
+
+  throw lastCfErr || new Error('AI 年画生成失败');
 }
 
 /**
- * 调用微信云内置混元多模态视觉模型 (hunyuan-vision) 识别自拍人像或实拍图的造型特征
+ * 调用微信云内置多模态视觉模型（优先使用成长计划上新的 deepseek-v4.1-flash / hy4，降级 hunyuan-vision）识别自拍人像或实拍图的造型特征
  */
 async function analyzePhotoWithHunyuanVision(imageSource) {
   let fileID = '';
   let httpsUrl = '';
 
-  if (typeof imageSource === 'string' && /^https?:\/\//i.test(imageSource)) {
-    httpsUrl = imageSource;
-  } else if (typeof imageSource === 'string' && imageSource.startsWith('cloud://')) {
-    fileID = imageSource;
-  } else if (typeof imageSource === 'string' && imageSource.startsWith('data:image/')) {
-    const isPng = /^data:image\/png/i.test(imageSource);
-    const ext = isPng ? 'png' : 'jpg';
-    const b64 = imageSource.replace(/^data:image\/\w+;base64,/, '');
-    const tempPath = writeUserFileSafe(`${wx.env.USER_DATA_PATH}/selfie_${Date.now()}.${ext}`, wx.base64ToArrayBuffer(b64));
-    fileID = await uploadSourceImageToCloud(tempPath, 'user-creation/selfie');
-  } else if (imageSource) {
-    fileID = await uploadSourceImageToCloud(imageSource, 'user-creation/selfie');
-  }
-
-  if (fileID && !httpsUrl) {
-    const urlRes = await wx.cloud.getTempFileURL({ fileList: [fileID] });
-    const item = urlRes && urlRes.fileList && urlRes.fileList[0];
-    if (item && item.tempFileURL) {
-      httpsUrl = item.tempFileURL;
+  try {
+    if (typeof imageSource === 'string' && /^https?:\/\//i.test(imageSource) && !/^http:\/\/(usr|tmp)\//i.test(imageSource)) {
+      httpsUrl = imageSource;
+    } else if (typeof imageSource === 'string' && imageSource.startsWith('cloud://')) {
+      fileID = imageSource;
+    } else if (typeof imageSource === 'string' && imageSource.startsWith('data:image/')) {
+      const isPng = /^data:image\/png/i.test(imageSource);
+      const ext = isPng ? 'png' : 'jpg';
+      const b64 = imageSource.replace(/^data:image\/\w+;base64,/, '');
+      const tempPath = writeUserFileSafe(`${wx.env.USER_DATA_PATH}/selfie_${Date.now()}.${ext}`, wx.base64ToArrayBuffer(b64));
+      fileID = await uploadSourceImageToCloud(tempPath, 'user-creation/selfie');
+    } else if (imageSource) {
+      fileID = await uploadSourceImageToCloud(imageSource, 'user-creation/selfie');
     }
+
+    if (fileID && !httpsUrl) {
+      httpsUrl = await resolveCloudTempHttpsUrl(fileID);
+    }
+  } catch (uploadErr) {
+    console.warn('[nianhuaPipeline] 云存储中转不可用，使用多模态默认特征继续生图:', uploadErr && uploadErr.message);
   }
 
   let visionTraits = '';
+  const visionPrompt = '请用50字以内精准提取图中人物或主体的核心造型特征（若是人像：性别年龄感、发型长短、是否戴眼镜/配饰、表情神态、标志性手势如比耶/抱拳、服装颜色与款式，忽略手持手机或杂乱背景；若是景物/器物：主体名称、造型结构与主要配色）。直接输出特征描述，不要客套话。';
+  const visionMessages = [{
+    role: 'user',
+    content: [
+      { type: 'text', text: visionPrompt },
+      { type: 'image_url', image_url: { url: httpsUrl } }
+    ]
+  }];
+
   if (httpsUrl && wx.cloud && wx.cloud.extend && wx.cloud.extend.AI && wx.cloud.extend.AI.createModel) {
-    try {
-      const model = wx.cloud.extend.AI.createModel('hunyuan-exp');
-      const res = await model.generateText({
-        model: 'hunyuan-vision',
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: '请用60字以内精准提取图中人物或主体的造型特征（若是人像：性别年龄感、发型长短、是否戴眼镜/配饰、表情神态、手势动作、服装颜色与款式；若是景物/器物：主体名称、造型结构与主要配色）。直接输出特征描述，不要客套话。'
-            },
-            {
-              type: 'image_url',
-              image_url: { url: httpsUrl }
-            }
-          ]
-        }]
-      });
-      const rawText = res && (res.text || (res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content));
-      if (rawText && !/没有看到|无法查看|请提供/.test(rawText)) {
-        visionTraits = String(rawText).trim();
+    // 优先使用小程序成长计划最新免费的 cloudbase 多模态模型 (deepseek-v4.1-flash / hy4)
+    const candidates = [
+      { provider: 'cloudbase', model: 'deepseek-v4.1-flash' },
+      { provider: 'cloudbase', model: 'hy4' },
+      { provider: 'hunyuan-exp', model: 'hunyuan-vision' }
+    ];
+    for (const cand of candidates) {
+      if (visionTraits) break;
+      try {
+        const modelInstance = wx.cloud.extend.AI.createModel(cand.provider);
+        const res = await modelInstance.generateText({
+          model: cand.model,
+          messages: visionMessages
+        });
+        const rawText = res && (res.text || (res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content));
+        if (rawText && !/没有看到|无法查看|无法提取|信息不足|请提供/.test(rawText)) {
+          visionTraits = String(rawText).trim();
+        }
+      } catch (visionErr) {
+        console.warn(`[nianhuaPipeline] ${cand.provider}/${cand.model} 识图切换下一候选:`, visionErr);
       }
-    } catch (visionErr) {
-      console.warn('[nianhuaPipeline] hunyuan-vision 识图降级:', visionErr);
     }
   }
 
@@ -577,7 +775,7 @@ function normalizeSavedLayers(rawLayers, workId) {
     } else if (layer.pngArrayBuffer) {
       const localPath = `${wx.env.USER_DATA_PATH}/user_layer_${workId}_${i}.png`;
       try {
-        layerPath = writeUserFileSafe(localPath, layer.pngArrayBuffer);
+        layerPath = writeUserFileSafe(localPath, layer.pngArrayBuffer, workId);
       } catch (err) {
         console.error('[nianhuaPipeline] 写入端侧 PNG 图层失败:', err);
       }
@@ -588,7 +786,7 @@ function normalizeSavedLayers(rawLayers, workId) {
       if (base64Data) {
         const localPath = `${wx.env.USER_DATA_PATH}/user_layer_${workId}_${i}.png`;
         try {
-          layerPath = writeUserFileSafe(localPath, wx.base64ToArrayBuffer(base64Data));
+          layerPath = writeUserFileSafe(localPath, wx.base64ToArrayBuffer(base64Data), workId);
         } catch (err) {
           console.error('[nianhuaPipeline] 写入本地图层失败:', err);
         }
@@ -679,6 +877,19 @@ function buildAdvancedWorkFromRecord(record, ordinal = 3) {
   };
 }
 
+function setStorageListSafe(key, list) {
+  let current = Array.isArray(list) ? list.slice() : [];
+  while (current.length > 0) {
+    try {
+      wx.setStorageSync(key, current);
+      return current;
+    } catch (e) {
+      current.pop();
+    }
+  }
+  return [];
+}
+
 /**
  * 统一将分色结果同步写入：
  * 1. 2D 爆炸图展厅缓存 (userColorLayers)
@@ -687,6 +898,7 @@ function buildAdvancedWorkFromRecord(record, ordinal = 3) {
 function saveWorkToDualStores(splitResult, options = {}) {
   const timestamp = Date.now();
   const workId = options.id || ('user_' + timestamp);
+  purgeStaleUserFiles(false, workId);
   const savedLayers = normalizeSavedLayers((splitResult && splitResult.layers) || [], workId);
 
   if (savedLayers.length === 0) {
@@ -699,17 +911,20 @@ function saveWorkToDualStores(splitResult, options = {}) {
     try {
       const previewPath = `${wx.env.USER_DATA_PATH}/quantized_${workId}.png`;
       if (splitResult.quantizedPngArrayBuffer) {
-        quantizedPreview = writeUserFileSafe(previewPath, splitResult.quantizedPngArrayBuffer);
+        quantizedPreview = writeUserFileSafe(previewPath, splitResult.quantizedPngArrayBuffer, workId);
       } else {
         const b64 = String(splitResult.quantizedBase64).replace(/^data:image\/\w+;base64,/, '');
-        quantizedPreview = writeUserFileSafe(previewPath, wx.base64ToArrayBuffer(b64));
+        quantizedPreview = writeUserFileSafe(previewPath, wx.base64ToArrayBuffer(b64), workId);
       }
     } catch (e) {
       console.warn('[nianhuaPipeline] 保存合成预览图失败:', e);
     }
   }
 
-  const originalImage = quantizedPreview || options.sourceFileID || options.sourceImage || savedLayers[0].tempPath;
+  const safeSourceImage = (options.sourceImage && !String(options.sourceImage).startsWith('data:image/'))
+    ? options.sourceImage
+    : '';
+  const originalImage = quantizedPreview || options.sourceFileID || safeSourceImage || savedLayers[0].tempPath;
   const record = {
     id: workId,
     title: String(options.title || '').trim() || ('我的年画 · ' + new Date().toLocaleDateString()),
@@ -729,7 +944,7 @@ function saveWorkToDualStores(splitResult, options = {}) {
     if (Array.isArray(storedGallery)) galleryList = storedGallery;
   } catch (e) {}
   const nextGalleryList = [record, ...galleryList.filter((item) => item && item.id !== record.id)].slice(0, MAX_USER_RECORDS);
-  wx.setStorageSync(USER_GALLERY_CACHE_KEY, nextGalleryList);
+  setStorageListSafe(USER_GALLERY_CACHE_KEY, nextGalleryList);
 
   // 2. 写入卷五交互版台缓存
   let advancedList = [];
@@ -743,7 +958,7 @@ function saveWorkToDualStores(splitResult, options = {}) {
     const rawName = String(item.name || '数字二创').replace(/^作品\d+\s*·\s*/, '');
     item.name = `作品${idx + 3} · ${rawName}`;
   });
-  wx.setStorageSync(USER_ADVANCED_WORKS_KEY, nextAdvancedList);
+  setStorageListSafe(USER_ADVANCED_WORKS_KEY, nextAdvancedList);
 
   return {
     record,

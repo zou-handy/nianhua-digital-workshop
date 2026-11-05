@@ -62,6 +62,10 @@ exports.main = async (event = {}) => {
   const ai = app.ai();
   const imageModel = ai.createImageModel(process.env.PROVIDER || 'hunyuan-image');
 
+  if (imageModel.generateImageSubUrlConfig && imageModel.generateImageSubUrlConfig['hunyuan-image']) {
+    imageModel.generateImageSubUrlConfig['hunyuan-image']['HY-Image-3.0-Plus-4090-Tob-v1.0'] = 'images/ar/generations';
+    imageModel.generateImageSubUrlConfig['hunyuan-image']['HY-Image-v3.0-I2I-ToB-v1.0.1'] = 'images/ar/generations';
+  }
   if (process.env.ENDPOINT_PATH) {
     imageModel.defaultGenerateImageSubUrl = process.env.ENDPOINT_PATH;
   }
@@ -76,20 +80,21 @@ exports.main = async (event = {}) => {
 
   const {
     style,
-    model = 'hunyuan-image',
+    model = 'HY-Image-3.0-Plus-4090-Tob-v1.0',
     version = 'v1.9',
     size = '1024x1024',
-    revise = false,
+    revise = { value: true },
     sourceImage,
     sourceImageUrl,
     sourceFileID,
     ...restEvent
   } = event;
-  const supportedSize = ['1024x1024', '768x768'].indexOf(size) > -1 ? size : '1024x1024';
+  const supportedSize = ['1024x1024', '1280x720', '720x1280', '1280x1280', '768x768'].indexOf(size) > -1 ? size : '1024x1024';
 
   try {
     let res = null;
     let usedMode = 't2i';
+    let i2iDebugError = '';
     const refUrl = await resolveSourceImageUrl(app, sourceImageUrl || sourceFileID || sourceImage);
 
     // 若传入了实拍参考图，优先尝试混元 3.0 图生图 (I2I) 接口，失败则自动无缝回退至文生图重绘
@@ -97,35 +102,39 @@ exports.main = async (event = {}) => {
       try {
         const i2iRes = await imageModel.generateImage({
           model: 'HY-Image-v3.0-I2I-ToB-v1.0.1',
-          prompt: event.prompt,
+          prompt: String(event.prompt).slice(0, 490),
           size: supportedSize,
           image_urls: [refUrl],
-          revise: { value: false }
+          revise: typeof revise === 'object' ? revise : { value: Boolean(revise) }
         });
         if (i2iRes && !i2iRes.error && i2iRes.data && i2iRes.data[0] && i2iRes.data[0].url) {
           res = i2iRes;
-          usedMode = 'i2i';
+          usedMode = 'hy-image-3.0-i2i';
+        } else if (i2iRes && i2iRes.error) {
+          i2iDebugError = JSON.stringify(i2iRes.error);
         }
       } catch (i2iErr) {
-        console.warn('[generateImage] I2I 接口不可用，自动回退标准重绘:', i2iErr && i2iErr.message);
+        i2iDebugError = String((i2iErr && (i2iErr.response && i2iErr.response.data ? JSON.stringify(i2iErr.response.data) : i2iErr.message)) || i2iErr);
+        console.warn('[generateImage] I2I 接口不可用，自动回退重绘:', i2iDebugError);
       }
     }
 
     if (!res) {
+      const targetT2IModel = (model && model !== 'HY-Image-v3.0-I2I-ToB-v1.0.1') ? model : 'hunyuan-image';
       res = await imageModel.generateImage({
-        model,
-        version,
+        model: targetT2IModel,
+        prompt: String(event.prompt).slice(0, 490),
         size: supportedSize,
-        revise,
-        ...(style ? { style } : {}),
-        ...restEvent
+        revise: typeof revise === 'object' ? revise : { value: Boolean(revise) },
+        ...(style ? { style } : {})
       });
+      usedMode = targetT2IModel;
     }
 
     const { data, error } = res || {};
 
     if (error) {
-      return { success: false, ...error };
+      return { success: false, i2iDebugError, ...error };
     }
 
     const img = data?.[0] || {};
@@ -135,6 +144,7 @@ exports.main = async (event = {}) => {
     return {
       ...rest,
       mode: usedMode,
+      i2iDebugError,
       imageUrl: storedImage?.fileID || url || '',
       fileID: storedImage?.fileID || '',
       originalImageUrl: url || '',

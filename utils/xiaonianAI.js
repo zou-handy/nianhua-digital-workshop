@@ -8,8 +8,8 @@ let agentUnavailable = false;
 const AVATAR_STORAGE_KEY = 'xiaonianAvatarGender';
 const XIAONIAN_CAPABILITY_TEXT = '我可以讲解佛山年画，也能打开 3D 展厅、完成 AI 创作与分色套印，并通过模型实验室检查、修改和回退你选中的 3D 模型。';
 const AVATARS = {
-  girl: 'cloud://cloud1-d7g47tfdyf7a14a31.636c-cloud1-d7g47tfdyf7a14a31-1448457900/ui/xiaonian/xiaonian-girl.jpg',
-  boy: 'cloud://cloud1-d7g47tfdyf7a14a31.636c-cloud1-d7g47tfdyf7a14a31-1448457900/ui/xiaonian/xiaonian-boy.jpg'
+  girl: 'https://636c-cloud1-d7g47tfdyf7a14a31-1448457900.tcb.qcloud.la/ui/xiaonian/xiaonian-girl.jpg',
+  boy: 'https://636c-cloud1-d7g47tfdyf7a14a31-1448457900.tcb.qcloud.la/ui/xiaonian/xiaonian-boy.jpg'
 };
 const CLIENT_TOOLS = [
   {

@@ -25,7 +25,7 @@ const TEST_FEED_TOKEN = normalizeFeedToken('AkhIJGqmi');
 const TEAM_FEED_TOKEN = normalizeFeedToken('token/AJoJvSMTf');
 const TEAM_SECOND_FEED_TOKEN = normalizeFeedToken('token/AZYq6GET6');
 const USER_ADVANCED_WORKS_KEY = 'advancedPrintUserWorks';
-const XIAONIAN_WORKING_IMAGE = 'cloud://cloud1-d7g47tfdyf7a14a31.636c-cloud1-d7g47tfdyf7a14a31-1448457900/ui/xiaonian/xiaonian-girl.jpg';
+const XIAONIAN_WORKING_IMAGE = 'https://636c-cloud1-d7g47tfdyf7a14a31-1448457900.tcb.qcloud.la/ui/xiaonian/xiaonian-girl.jpg';
 let runtimeAdvancedPrintSets = ADVANCED_PRINT_SETS.slice();
 
 const NIANHUA_GALLERY_PAGE = 5;
@@ -610,6 +610,8 @@ Page({
     openingEffectUrl: '',
     openingEffectVisible: false,
     openingEffectPlaying: false,
+    openingStageBadge: '壹 · 松烟墨线落版',
+    openingActiveStep: 0,
     currentPage: 0,
     volumeTransitionActive: false,
     musicPlaying: false,
@@ -803,7 +805,13 @@ Page({
     showExplanation: false
   },
 
-  onLoad() {
+  onLoad(options) {
+    if (options && options.page !== undefined) {
+      const targetPage = parseInt(options.page, 10);
+      if (!isNaN(targetPage) && targetPage >= 0) {
+        this.setData({ currentPage: targetPage });
+      }
+    }
     this._loadAdvancedUserWorks();
     this.bgMusic = wx.createInnerAudioContext();
     this.preloadToolImages();
@@ -816,11 +824,6 @@ Page({
     });
     this.bgMusic.loop = true;
     this.bgMusic.volume = 0.25;
-    resolveCloudURL(VIDEOS.openingWelcome).then((url) => {
-      this.setData({ openingEffectUrl: url });
-    }).catch((err) => {
-      console.error('[首页开场] 欢迎视频临时链接获取失败:', err);
-    });
   },
 
   onReady() {
@@ -967,6 +970,7 @@ Page({
   onUnload() {
     clearInterval(this._creatorWorkingTimer);
     this._clearOpeningSequenceTimers();
+    this._stopOpeningAwakeningCanvas();
     this._stopNianhuaGalleryLoop();
     if (this._galleryGuideTimer) clearTimeout(this._galleryGuideTimer);
     if (this._galleryResumeTimer) clearTimeout(this._galleryResumeTimer);
@@ -1045,72 +1049,67 @@ Page({
 
   _scheduleOpeningEffect() {
     this._clearOpeningSequenceTimers();
-    this._openingEffectAttempts = 0;
+    this._stopOpeningAwakeningCanvas();
+
+    const stepBadges = [
+      { delay: 200, step: 0, badge: '壹 · 松烟墨线落版' },
+      { delay: 680, step: 1, badge: '贰 · 万年红铺底' },
+      { delay: 1120, step: 2, badge: '叁 · 石黄提亮' },
+      { delay: 1560, step: 3, badge: '肆 · 青绿收版' }
+    ];
+
     this.setData({
       openingEffectVisible: false,
-      openingEffectPlaying: false
+      openingEffectPlaying: false,
+      openingActiveStep: 0,
+      openingStageBadge: '壹 · 松烟墨线落版'
     }, () => {
+      this._openingStepTimers = stepBadges.map((item) => setTimeout(() => {
+        if (this.data.currentPage !== 0) return;
+        this.setData({
+          openingActiveStep: item.step,
+          openingStageBadge: item.badge
+        });
+      }, item.delay));
+
       this._openingEffectTimer = setTimeout(() => {
         this._playOpeningEffect();
-      }, 2860);
+      }, 2180);
     });
   },
 
   _playOpeningEffect() {
     this._openingEffectTimer = null;
     if (this.data.currentPage !== 0) return;
-    if (!this.data.openingEffectUrl) {
-      this._openingEffectAttempts += 1;
-      if (this._openingEffectAttempts <= 3) {
-        this._openingEffectTimer = setTimeout(() => this._playOpeningEffect(), 700);
-      }
-      return;
-    }
+
     this.setData({
       openingEffectVisible: true,
-      openingEffectPlaying: false
+      openingEffectPlaying: true,
+      openingActiveStep: 3,
+      openingStageBadge: '伍 · 勾线描金 · 灵韵开相'
     }, () => {
-      this._openingVideoStartTimer = setTimeout(() => {
-        if (!this.data.openingEffectPlaying) {
-          console.warn('[首页开场] 欢迎视频未能及时播放，已自动跳过');
-          this._hideOpeningEffect();
-        }
-      }, 3200);
+      this._startOpeningAwakeningCanvas();
+      this._openingVideoFinishTimer = setTimeout(() => {
+        this._hideOpeningEffect(true);
+      }, 4800);
     });
   },
 
-  onOpeningEffectPlay() {
-    if (this._openingVideoStartTimer) {
-      clearTimeout(this._openingVideoStartTimer);
-      this._openingVideoStartTimer = null;
-    }
-    // Native video may dispatch play before its first frame is composited on device.
-    // Keep it transparent briefly so the completed print remains continuous.
-    this._openingVideoRevealTimer = setTimeout(() => {
-      if (this.data.openingEffectVisible) {
-        this.setData({ openingEffectPlaying: true });
-      }
-      this._openingVideoRevealTimer = null;
-    }, 90);
-    this._openingVideoFinishTimer = setTimeout(() => {
-      this._hideOpeningEffect();
-    }, 5000);
+  _startOpeningAwakeningCanvas() {
+    this._s1AwakeningRunning = true;
   },
 
-  onOpeningEffectEnded() {
-    this._hideOpeningEffect();
+  _stopOpeningAwakeningCanvas() {
+    this._s1AwakeningRunning = false;
   },
 
-  onOpeningEffectError(e) {
-    console.error('[首页开场] 欢迎视频播放失败:', e && e.detail);
-    this._hideOpeningEffect();
-  },
-
-  _hideOpeningEffect() {
+  _hideOpeningEffect(keepBadge) {
     this._clearOpeningSequenceTimers();
+    this._stopOpeningAwakeningCanvas();
     this.setData({
       openingEffectVisible: false,
-      openingEffectPlaying: false
+      openingEffectPlaying: false,
+      openingStageBadge: keepBadge ? '四版套印 · 描金礼成' : ''
     });
   },
 
@@ -1125,20 +1124,30 @@ Page({
       if (this[name]) clearTimeout(this[name]);
       this[name] = null;
     });
+    if (Array.isArray(this._openingStepTimers)) {
+      this._openingStepTimers.forEach((t) => clearTimeout(t));
+      this._openingStepTimers = [];
+    }
   },
 
   replayOpeningPrint() {
-    this._scheduleOpeningEffect();
+    this._clearOpeningSequenceTimers();
+    this._stopOpeningAwakeningCanvas();
     if (this._openingReplayTimer) {
       clearTimeout(this._openingReplayTimer);
       this._openingReplayTimer = null;
     }
 
-    this.setData({ openingPrintVisible: false });
+    this.setData({
+      openingPrintVisible: false,
+      openingEffectVisible: false,
+      openingEffectPlaying: false
+    });
     this._openingReplayTimer = setTimeout(() => {
       this.setData({ openingPrintVisible: true });
+      this._scheduleOpeningEffect();
       this._openingReplayTimer = null;
-    }, 40);
+    }, 45);
 
     if (wx.vibrateShort) {
       wx.vibrateShort({ type: 'light' });

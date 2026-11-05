@@ -1,4 +1,4 @@
-const CLOUD_BASE = 'cloud://cloud1-d7g47tfdyf7a14a31.636c-cloud1-d7g47tfdyf7a14a31-1448457900';
+const CLOUD_BASE = 'https://636c-cloud1-d7g47tfdyf7a14a31-1448457900.tcb.qcloud.la';
 
 const MODELS = {
   house: `${CLOUD_BASE}/model/house.glb`,

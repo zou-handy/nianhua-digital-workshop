@@ -175,13 +175,15 @@ Page({
     });
 
     try {
-      const presetGalleries = await this._getPresetGalleries(options.preset);
       const userGalleries = options.preset
         ? []
         : await this._localizeGalleries(this._getValidUserGalleries());
+      const shouldShowLatestUser = options.showLatestUser === 'true' && userGalleries.length > 0;
+      const presetGalleries = shouldShowLatestUser
+        ? []
+        : await this._getPresetGalleries(options.preset);
       const colorLayersList = [...presetGalleries, ...userGalleries];
       const requestedPresetIndex = presetGalleries.findIndex((item) => item.id === options.preset);
-      const shouldShowLatestUser = options.showLatestUser === 'true' && userGalleries.length > 0;
       const currentIndex = requestedPresetIndex >= 0
         ? requestedPresetIndex
         : (shouldShowLatestUser ? presetGalleries.length : 0);
@@ -189,6 +191,7 @@ Page({
       this.setData({
         colorLayersList,
         currentIndex,
+        isExploded: shouldShowLatestUser ? true : this.data.isExploded,
         loading: false,
         loadingProgress: ''
       }, () => {
@@ -619,7 +622,7 @@ Page({
       try {
         const layers = await Promise.all(gallery.layers.map(async (layer) => {
           const source = layer.fileID || layer.tempPath;
-          if (this._isCloudFilePath(source) || /^https?:\/\//i.test(source)) {
+          if (this._isCloudFilePath(source) || (/^https?:\/\//i.test(source) && !/^http:\/\/(usr|tmp)\//i.test(source))) {
             return {
               ...layer,
               tempPath: await downloadFileToTemp(source)
@@ -664,7 +667,7 @@ Page({
           tempPath: layer.fileID || layer.tempPath,
           fileID: layer.fileID || (this._isCloudFilePath(layer.tempPath) ? layer.tempPath : ''),
           color: layer.color,
-          label: getPreciseLayerLabel(layer.color, layer.label)
+          label: layer.label || getPreciseLayerLabel(layer.color, layer.label)
         })),
         timestamp: record.timestamp
       }));
@@ -688,7 +691,7 @@ Page({
         if (!src) {
           throw new Error('empty layer source');
         }
-        if (this._isCloudFilePath(src)) {
+        if (this._isCloudFilePath(src) || String(src).indexOf('data:image/') === 0) {
           return;
         }
         fs.accessSync(src);
