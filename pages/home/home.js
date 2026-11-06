@@ -607,7 +607,7 @@ Page({
     VIDEOS,
     openingLayers: OPENING_PRINT_LAYERS,
     openingPrintVisible: true,
-    openingEffectUrl: '',
+    openingEffectUrl: VIDEOS.openingWelcome,
     openingEffectVisible: false,
     openingEffectPlaying: false,
     openingStageBadge: '壹 · 松烟墨线落版',
@@ -815,6 +815,9 @@ Page({
     this._loadAdvancedUserWorks();
     this.bgMusic = wx.createInnerAudioContext();
     this.preloadToolImages();
+    resolveCloudURL(VIDEOS.openingWelcome).then((url) => {
+      if (url) this.setData({ openingEffectUrl: url });
+    }).catch(() => {});
     resolveCloudURL(VIDEOS.story).then((url) => {
       if (this.bgMusic) {
         this.bgMusic.src = url;
@@ -995,14 +998,33 @@ Page({
     }
   },
 
+  onSwiperTransition(e) {
+    if (this.data.openingEffectVisible && e && e.detail && Math.abs(e.detail.dy || 0) > 8) {
+      this._hideOpeningEffect(false);
+    }
+  },
+
+  onScreen1TouchStart(e) {
+    const touch = e && e.touches && e.touches[0];
+    this._s1TouchStartY = touch ? touch.clientY : null;
+  },
+
+  onScreen1TouchMove(e) {
+    if (!this.data.openingEffectVisible || this._s1TouchStartY === null || this._s1TouchStartY === undefined) return;
+    const touch = e && e.touches && e.touches[0];
+    if (!touch) return;
+    if (Math.abs(touch.clientY - this._s1TouchStartY) > 10) {
+      this._hideOpeningEffect(false);
+    }
+  },
+
   onSwiperChange(e) {
     const page = e.detail.current;
     const previousPage = this.data.currentPage;
-    this.setData({ currentPage: page });
-
-    if (previousPage === 0 && page !== 0 && this.data.openingEffectVisible) {
-      this._hideOpeningEffect();
+    if (page !== 0 && this.data.openingEffectVisible) {
+      this._hideOpeningEffect(false);
     }
+    this.setData({ currentPage: page });
 
     if (page === NIANHUA_GALLERY_PAGE) this._startNianhuaGalleryLoop();
     if (previousPage === NIANHUA_GALLERY_PAGE && page !== NIANHUA_GALLERY_PAGE) {
@@ -1032,11 +1054,17 @@ Page({
 
   goToPage(e) {
     const page = parseInt(e.currentTarget.dataset.page, 10);
+    if (page !== 0 && this.data.openingEffectVisible) {
+      this._hideOpeningEffect(false);
+    }
     this.setData({ currentPage: page });
   },
 
   enterExplore() {
     // 封面 CTA：直接进入下一屏（史）
+    if (this.data.openingEffectVisible) {
+      this._hideOpeningEffect(false);
+    }
     if (wx.vibrateShort) {
       wx.vibrateShort({ type: 'light' });
     }
@@ -1084,15 +1112,57 @@ Page({
 
     this.setData({
       openingEffectVisible: true,
-      openingEffectPlaying: true,
+      openingEffectPlaying: false,
       openingActiveStep: 3,
       openingStageBadge: '伍 · 破框迎客 · 门神问好'
     }, () => {
       this._startOpeningAwakeningCanvas();
-      this._openingVideoFinishTimer = setTimeout(() => {
-        this._hideOpeningEffect(true);
-      }, 3800);
+      wx.nextTick(() => {
+        try {
+          const videoCtx = wx.createVideoContext('s1OpeningVideo', this);
+          if (videoCtx && videoCtx.play) videoCtx.play();
+        } catch (err) {}
+      });
+      this._openingVideoStartTimer = setTimeout(() => {
+        if (!this.data.openingEffectPlaying) {
+          this._hideOpeningEffect(true);
+        }
+      }, 4500);
     });
+  },
+
+  onOpeningVideoPlay() {
+    if (this.data.currentPage !== 0) {
+      this._hideOpeningEffect(false);
+      return;
+    }
+    if (this._openingVideoStartTimer) {
+      clearTimeout(this._openingVideoStartTimer);
+      this._openingVideoStartTimer = null;
+    }
+    this._openingVideoFinishTimer = setTimeout(() => {
+      this._hideOpeningEffect(true);
+    }, 4200);
+  },
+
+  onOpeningVideoTimeUpdate(e) {
+    if (this.data.currentPage !== 0) {
+      this._hideOpeningEffect(false);
+      return;
+    }
+    const ct = e && e.detail ? e.detail.currentTime : 0;
+    if (!this.data.openingEffectPlaying && ct > 0.02) {
+      this.setData({ openingEffectPlaying: true });
+    }
+  },
+
+  onOpeningVideoEnded() {
+    this._hideOpeningEffect(true);
+  },
+
+  onOpeningVideoError(e) {
+    console.warn('[首页] 开场视频播放失败，优雅回退静态四版年画:', e && e.detail);
+    this._hideOpeningEffect(true);
   },
 
   _startOpeningAwakeningCanvas() {
@@ -1106,6 +1176,12 @@ Page({
   _hideOpeningEffect(keepBadge) {
     this._clearOpeningSequenceTimers();
     this._stopOpeningAwakeningCanvas();
+    try {
+      const videoCtx = wx.createVideoContext('s1OpeningVideo', this);
+      if (videoCtx && videoCtx.stop) {
+        videoCtx.stop();
+      }
+    } catch (err) {}
     this.setData({
       openingEffectVisible: false,
       openingEffectPlaying: false,

@@ -21,7 +21,7 @@ const MODELS = {
 const VIDEOS = {
   making: `${CLOUD_BASE}/knowledge/nianhua-making.mp4`,
   story: `${CLOUD_BASE}/knowledge/nianhua-story.mp4`,
-  openingWelcome: `${CLOUD_BASE}/knowledge/opening/opening-welcome-top-h264.mp4`
+  openingWelcome: `${CLOUD_BASE}/knowledge/opening/opening-welcome-clean-h264.mp4`
 };
 
 const IMAGES = {
