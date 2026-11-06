@@ -1447,6 +1447,8 @@ page {
 .advanced-thumb-turn-1 { animation-delay: -1.9s; }
 .advanced-thumb-turn-2 { animation-delay: -3.8s; }
 .advanced-thumb-turn-3 { animation-delay: -5.7s; }
+.advanced-thumb-turn-4 { animation-delay: -1.2s; }
+.advanced-thumb-turn-5 { animation-delay: -4.6s; }
 
 .advanced-thumb-depth {
   filter: brightness(0.48) sepia(0.35);

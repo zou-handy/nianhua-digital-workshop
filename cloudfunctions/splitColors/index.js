@@ -51,6 +51,7 @@ exports.main = async (event = {}) => {
     for (let layerIndex = 0; layerIndex < coreResult.layers.length; layerIndex++) {
       const layer = coreResult.layers[layerIndex];
       let fileID = '';
+      let boardFileID = '';
 
       if (!event.localOnly && app && typeof app.uploadFile === 'function') {
         const uploadResult = await app.uploadFile({
@@ -58,11 +59,18 @@ exports.main = async (event = {}) => {
           fileContent: layer.pngBuffer
         });
         fileID = uploadResult.fileID || '';
+        if (layer.boardPngBuffer) {
+          const boardUpload = await app.uploadFile({
+            cloudPath: createLayerCloudPath(jobId, 'board_' + layerIndex, outputPrefix),
+            fileContent: layer.boardPngBuffer
+          });
+          boardFileID = boardUpload.fileID || '';
+        }
       }
 
       const layerResult = {
         key: layer.key,
-        name: 'color_' + (layerIndex + 1),
+        name: layer.name || layer.label || ('color_' + (layerIndex + 1)),
         label: layer.label,
         shortName: layer.shortName,
         material: layer.material,
@@ -70,11 +78,15 @@ exports.main = async (event = {}) => {
         color: layer.color,
         pixelCount: layer.pixelCount,
         coverageRatio: layer.coverageRatio,
-        fileID
+        fileID,
+        boardFileID
       };
 
       if (shouldReturnBase64) {
         layerResult.data = 'data:image/png;base64,' + layer.pngBuffer.toString('base64');
+        if (layer.boardPngBuffer) {
+          layerResult.boardData = 'data:image/png;base64,' + layer.boardPngBuffer.toString('base64');
+        }
       }
 
       results.push(layerResult);
@@ -216,8 +228,13 @@ function processImageBuffer(imageBuffer, options = {}) {
       }
     }
 
+    const boardPng = new PNG({ width, height });
+    const carvedRgba = generateCarvedWoodblockRgba(pixelAssignment, layerIndex, [plate.r, plate.g, plate.b], width, height);
+    boardPng.data = Buffer.from(carvedRgba);
+
     layers.push({
       key: plate.key || ('color_' + (layerIndex + 1)),
+      name: plate.name || ((plate.label || '').replace(/版$/, '') + '木板'),
       label: plate.label,
       shortName: plate.shortName || plate.label.slice(0, 1),
       material: plate.material || '矿物颜料',
@@ -225,7 +242,8 @@ function processImageBuffer(imageBuffer, options = {}) {
       color: plate.hex,
       pixelCount,
       coverageRatio: Number((pixelCount / Math.max(1, foregroundCount)).toFixed(4)),
-      pngBuffer: PNG.sync.write(layerPng)
+      pngBuffer: PNG.sync.write(layerPng),
+      boardPngBuffer: PNG.sync.write(boardPng)
     });
   }
 
@@ -1088,6 +1106,161 @@ function rgbToHsl(r, g, b) {
     }
   }
   return [h, s, l];
+}
+
+function clampByte(v, min, max) {
+  return v < min ? min : v > max ? max : v;
+}
+
+function generateCarvedWoodblockRgba(cleanedLabels, plateIndex, plateRgb, width, height) {
+  const total = width * height;
+  const out = new Uint8Array(total * 4);
+  const bevel = Math.max(5, Math.round(Math.min(width, height) * 0.022));
+  const cornerR = Math.max(7, Math.round(Math.min(width, height) * 0.032));
+
+  const xWave = new Float32Array(width);
+  const xGouge = new Float32Array(width);
+  const xSheen = new Float32Array(width);
+  for (let x = 0; x < width; x++) {
+    xWave[x] = Math.sin(x * 0.022) * 5.2 + Math.cos(x * 0.058) * 2.1;
+    xGouge[x] = Math.sin(x * 0.15) * 2.8;
+    xSheen[x] = Math.cos((x / width - 0.34) * 2.1) * 13;
+  }
+
+  const ySheen = new Float32Array(height);
+  for (let y = 0; y < height; y++) {
+    ySheen[y] = Math.cos((y / height - 0.30) * 2.1);
+  }
+
+  const fiberLen = (height + 32) * 4;
+  const fiberLut = new Float32Array(fiberLen);
+  for (let k = 0; k < fiberLen; k++) {
+    const yf = k * 0.25;
+    fiberLut[k] = Math.sin(yf * 0.56) * 6.8 + Math.cos(yf * 1.45) * 3.2 + Math.sin(yf * 0.13) * 8.4;
+  }
+
+  const pr = plateRgb[0], pg = plateRgb[1], pb = plateRgb[2];
+  const isInkPlate = plateIndex === 0;
+
+  for (let y = 0; y < height; y++) {
+    const rowOffset = y * width;
+    const ys = ySheen[y];
+    const inTopBevel = y < bevel;
+    const inBottomBevel = y >= height - bevel;
+
+    for (let x = 0; x < width; x++) {
+      const idx = rowOffset + x;
+      const outIdx = idx * 4;
+
+      let dx = 0, dy = 0;
+      if (x < cornerR && y < cornerR) { dx = cornerR - x; dy = cornerR - y; }
+      else if (x >= width - cornerR && y < cornerR) { dx = x - (width - 1 - cornerR); dy = cornerR - y; }
+      else if (x < cornerR && y >= height - cornerR) { dx = cornerR - x; dy = y - (height - 1 - cornerR); }
+      else if (x >= width - cornerR && y >= height - cornerR) { dx = x - (width - 1 - cornerR); dy = y - (height - 1 - cornerR); }
+      if (dx > 0 && dy > 0 && (dx * dx + dy * dy > cornerR * cornerR)) {
+        out[outIdx + 3] = 0;
+        continue;
+      }
+
+      const lutIdx = clampByte(Math.round((y + 12 + xWave[x]) * 4), 0, fiberLen - 1);
+      const grain = fiberLut[lutIdx];
+      const sheen = xSheen[x] * ys;
+      const inLeftBevel = x < bevel;
+      const inRightBevel = x >= width - bevel;
+
+      if (inTopBevel || inBottomBevel || inLeftBevel || inRightBevel) {
+        let bevelLight = 0;
+        if (inTopBevel || inLeftBevel) bevelLight += 24;
+        if (inBottomBevel || inRightBevel) bevelLight -= 36;
+        if ((inTopBevel && inLeftBevel)) bevelLight += 10;
+        if ((inBottomBevel && inRightBevel)) bevelLight -= 12;
+
+        const dEdge = Math.min(x, width - 1 - x, y, height - 1 - y);
+        const rimLine = dEdge === bevel - 1 ? -18 : 0;
+        const delta = grain * 0.72 + sheen * 0.65 + bevelLight + rimLine;
+
+        out[outIdx] = clampByte(Math.round(114 + delta), 24, 235);
+        out[outIdx + 1] = clampByte(Math.round(66 + delta * 0.68), 14, 185);
+        out[outIdx + 2] = clampByte(Math.round(35 + delta * 0.45), 8, 130);
+        out[outIdx + 3] = 255;
+        continue;
+      }
+
+      const raised = cleanedLabels[idx] === plateIndex;
+      if (raised) {
+        const tlRecessed = (cleanedLabels[idx - width - 1] !== plateIndex)
+          || (cleanedLabels[idx - width] !== plateIndex)
+          || (cleanedLabels[idx - 1] !== plateIndex);
+        const brRecessed = (cleanedLabels[idx + width + 1] !== plateIndex)
+          || (cleanedLabels[idx + width] !== plateIndex)
+          || (cleanedLabels[idx + 1] !== plateIndex);
+
+        const woodMod = grain * 0.55 + sheen * 0.42;
+        let r = pr * 0.86 + (118 + woodMod) * 0.14 + woodMod * 0.45;
+        let g = pg * 0.86 + (70 + woodMod * 0.7) * 0.14 + woodMod * 0.38;
+        let b = pb * 0.86 + (38 + woodMod * 0.45) * 0.14 + woodMod * 0.30;
+
+        if (tlRecessed) {
+          if (isInkPlate) {
+            r += 62; g += 40; b += 22;
+          } else {
+            r += 38; g += 32; b += 24;
+          }
+        } else if (brRecessed) {
+          r -= 20; g -= 18; b -= 14;
+        }
+
+        out[outIdx] = clampByte(Math.round(r), 12, 252);
+        out[outIdx + 1] = clampByte(Math.round(g), 10, 248);
+        out[outIdx + 2] = clampByte(Math.round(b), 8, 240);
+        out[outIdx + 3] = 255;
+        continue;
+      }
+
+      const gougeRipple = Math.sin((y + (x >> 2)) * 0.68 + xGouge[x]) * 4.8;
+      let recessDelta = grain * 0.88 + sheen * 0.55 + gougeRipple;
+
+      if (x <= bevel + 2 || y <= bevel + 2) {
+        recessDelta -= (x === bevel || y === bevel) ? 34 : 18;
+      } else if (x >= width - bevel - 2 || y >= height - bevel - 2) {
+        recessDelta += 12;
+      }
+
+      const ul1 = (cleanedLabels[idx - width - 1] === plateIndex)
+        || (cleanedLabels[idx - width] === plateIndex)
+        || (cleanedLabels[idx - 1] === plateIndex);
+      const ul2 = !ul1 && x > bevel + 1 && y > bevel + 1 && (
+        cleanedLabels[idx - width * 2 - 2] === plateIndex ||
+        cleanedLabels[idx - width * 2 - 1] === plateIndex ||
+        cleanedLabels[idx - width - 2] === plateIndex
+      );
+      const ul3 = !ul1 && !ul2 && x > bevel + 2 && y > bevel + 2 && (
+        cleanedLabels[idx - width * 3 - 3] === plateIndex ||
+        cleanedLabels[idx - width * 2 - 3] === plateIndex ||
+        cleanedLabels[idx - width * 3 - 2] === plateIndex
+      );
+
+      const dr1 = (cleanedLabels[idx + width + 1] === plateIndex)
+        || (cleanedLabels[idx + width] === plateIndex)
+        || (cleanedLabels[idx + 1] === plateIndex);
+      const dr2 = !dr1 && x < width - bevel - 2 && y < height - bevel - 2 && (
+        cleanedLabels[idx + width * 2 + 2] === plateIndex
+      );
+
+      if (ul1) recessDelta -= 44;
+      else if (ul2) recessDelta -= 28;
+      else if (ul3) recessDelta -= 14;
+      else if (dr1) recessDelta += 22;
+      else if (dr2) recessDelta += 10;
+
+      out[outIdx] = clampByte(Math.round(86 + recessDelta), 18, 210);
+      out[outIdx + 1] = clampByte(Math.round(48 + recessDelta * 0.64), 10, 155);
+      out[outIdx + 2] = clampByte(Math.round(25 + recessDelta * 0.42), 5, 105);
+      out[outIdx + 3] = 255;
+    }
+  }
+
+  return out;
 }
 
 exports.processImageBuffer = processImageBuffer;

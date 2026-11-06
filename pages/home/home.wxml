@@ -387,7 +387,7 @@
                 </text>
               </view>
             </view>
-            <view class="advanced-board-slot {{advancedPlacedBlock ? 'advanced-slot-filled' : ''}} {{advancedCurrentWork.isUserCreated && advancedPlacedBlock ? 'advanced-user-woodblock-surface' : ''}}" bindtap="viewAdvancedBlock3D">
+            <view class="advanced-board-slot {{advancedPlacedBlock ? 'advanced-slot-filled' : ''}}" bindtap="viewAdvancedBlock3D">
               <image
                 wx:if="{{advancedPlacedBlock}}"
                 class="advanced-board-img {{advancedBoardMoving ? 'advanced-board-moving' : ''}}"
@@ -452,13 +452,13 @@
         <view class="advanced-board-tray {{advancedBlocks.length > 4 ? 'advanced-board-tray-multi' : ''}}">
           <view
             wx:for="{{advancedBlocks}}"
-            wx:key="name"
+            wx:key="boardImage"
             class="advanced-board-thumb {{item.placed?'advanced-thumb-empty':''}} {{item.printed?'advanced-thumb-printed':''}}"
             style="--advanced-color:{{item.color}};"
             data-index="{{index}}"
             bindtap="selectAdvancedBlock"
           >
-            <view class="advanced-thumb-frame {{advancedCurrentWork.isUserCreated ? 'advanced-user-woodblock-surface' : ''}}">
+            <view class="advanced-thumb-frame">
               <view class="advanced-thumb-turn advanced-thumb-turn-{{index}}">
                 <image class="advanced-thumb-img advanced-thumb-depth advanced-thumb-depth-back" src="{{item.boardImage}}" mode="aspectFit"></image>
                 <image class="advanced-thumb-img advanced-thumb-depth advanced-thumb-depth-mid" src="{{item.boardImage}}" mode="aspectFit"></image>

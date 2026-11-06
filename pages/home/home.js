@@ -1544,7 +1544,7 @@ Page({
   switchAdvancedWork(e) {
     var index = parseInt(e.currentTarget.dataset.index, 10);
     if (!Number.isFinite(index) || index < 0 || index >= runtimeAdvancedPrintSets.length) return;
-    if (index === this.data.advancedWorkIndex) return;
+    if (index === this.data.advancedWorkIndex && !(e && e.force)) return;
 
     var steps = getAdvancedPrintSteps(index);
     this.setData({
@@ -2061,7 +2061,7 @@ Page({
         if (aiFloat) aiFloat.setPageContext({ chapter: '版台' });
       });
       if (workIndex > -1) {
-        this.switchAdvancedWork({ currentTarget: { dataset: { index: workIndex } } });
+        this.switchAdvancedWork({ force: true, currentTarget: { dataset: { index: workIndex } } });
         wx.showToast({ title: (saved.advancedWork.steps.length || 4) + '块雕版已装入卷五版台', icon: 'success' });
       }
     } catch (err) {
@@ -2088,14 +2088,6 @@ Page({
     }
 
     if (/^https?:\/\//i.test(filePath)) {
-      if (/\.tcb\.qcloud\.la\//i.test(filePath)) {
-        try {
-          var tempFilePath = await this._downloadAdvancedCreatorImage(filePath);
-          return await this._uploadOrEncodeCreatorSource(tempFilePath);
-        } catch (dlErr) {
-          console.warn('[卷五二创] 临时链接本地下载跳过，直接透传 URL:', dlErr);
-        }
-      }
       return filePath;
     }
 
@@ -2631,12 +2623,13 @@ Page({
     app.globalData._pendingModelPreview = block.boardImage;
     app.globalData._pendingModelMode = useProcedural ? 'procedural' : 'glb';
     if (useProcedural) {
-      app.globalData._pendingModelUrl = '';
-      app.globalData._xiaonianModelContext = {
-        unavailable: true,
-        name: block.name + ' · 2.5D 木板'
-      };
-      wx.navigateTo({ url: '/pages/model3d-viewer/model3d-viewer' });
+      this.setData({
+        advancedBoardPreviewOpen: true,
+        advancedBoardPreview: block,
+        advancedBoardPreviewRotateX: -6,
+        advancedBoardPreviewRotateY: -18,
+        advancedBoardPreviewScale: 1
+      });
       return;
     }
     modelLab.setCurrentModel({

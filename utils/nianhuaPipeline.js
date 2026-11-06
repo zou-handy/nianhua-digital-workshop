@@ -132,7 +132,7 @@ function purgeStaleUserFiles(aggressive = false, keepToken = '') {
         }
         if (
           aggressive ||
-          /^edge_src_|^selfie_|^probe_|^stylized_nianhua_|^quantized_|^user_layer_|\.(glb|gltf|bin|tmp)$/i.test(name)
+          /^edge_src_|^selfie_|^probe_|^stylized_nianhua_|^quantized_|^user_layer_|^user_board_|\.(glb|gltf|bin|tmp)$/i.test(name)
         ) {
           fs.unlinkSync(fullPath);
         }
@@ -203,22 +203,20 @@ function resolveLocalImagePathForCanvas(imageSource) {
     }
     if (/^https?:\/\//i.test(src) && !/^http:\/\/(usr|tmp)\//i.test(src)) {
       if (!isWhitelistedDownloadUrl(src)) {
-        // 外部 COS/HTTP 链接不在小程序 downloadFile 合法域名列表时，跳过 getImageInfo/downloadFile，直接交由 OffscreenCanvas Image 加载
+        // 外部 COS/HTTP 链接不在小程序 downloadFile 合法域名列表时，跳过 getImageInfo/downloadFile，直接交由云函数中转
         resolve(src);
         return;
       }
-      wx.getImageInfo({
-        src,
-        success: (res) => {
-          resolve((res && res.path) || src);
+      wx.downloadFile({
+        url: src,
+        success: (dl) => {
+          if (dl && dl.statusCode >= 200 && dl.statusCode < 300 && dl.tempFilePath) {
+            resolve(dl.tempFilePath);
+          } else {
+            resolve(src);
+          }
         },
-        fail: () => {
-          wx.downloadFile({
-            url: src,
-            success: (dl) => resolve((dl && dl.tempFilePath) || src),
-            fail: () => resolve(src)
-          });
-        }
+        fail: () => resolve(src)
       });
       return;
     }
@@ -330,7 +328,7 @@ async function runEdgeWoodblockSplit(imageSource, payload = {}) {
     rawH = img.height;
   }
 
-  const maxDim = 520;
+  const maxDim = 260;
   const scale = Math.min(1, maxDim / Math.max(rawW, rawH));
   const width = Math.max(64, Math.round(rawW * scale));
   const height = Math.max(64, Math.round(rawH * scale));
@@ -847,11 +845,39 @@ function normalizeSavedLayers(rawLayers, workId) {
 
     if (!layerPath) continue;
 
+    let boardPath = '';
+    if (layer.boardFileID) {
+      boardPath = layer.boardFileID;
+    } else if (layer.boardPngArrayBuffer) {
+      const localBoardPath = `${wx.env.USER_DATA_PATH}/user_board_${workId}_${i}.png`;
+      try {
+        boardPath = writeUserFileSafe(localBoardPath, layer.boardPngArrayBuffer, workId);
+      } catch (err) {
+        console.error('[nianhuaPipeline] 写入端侧雕版木板 PNG 失败:', err);
+      }
+    } else if (layer.boardData || layer.boardPngBuffer) {
+      const boardBase64 = layer.boardPngBuffer
+        ? Buffer.from(layer.boardPngBuffer).toString('base64')
+        : String(layer.boardData || '').replace(/^data:image\/\w+;base64,/, '');
+      if (boardBase64) {
+        const localBoardPath = `${wx.env.USER_DATA_PATH}/user_board_${workId}_${i}.png`;
+        try {
+          boardPath = writeUserFileSafe(localBoardPath, wx.base64ToArrayBuffer(boardBase64), workId);
+        } catch (err) {
+          console.error('[nianhuaPipeline] 写入本地雕版木板失败:', err);
+        }
+      }
+    } else if (layer.boardTempPath) {
+      boardPath = layer.boardTempPath;
+    }
+
     const validName = (layer.name && !/^color_\d+$/i.test(String(layer.name))) ? layer.name : '';
     savedLayers.push({
       key: layer.key || meta.key || ('color_' + (i + 1)),
       tempPath: layerPath,
       fileID: layer.fileID || '',
+      boardTempPath: boardPath || layerPath,
+      boardFileID: layer.boardFileID || '',
       name: validName || (layer.label ? layer.label.replace(/版$/, '') + '木板' : '') || meta.name || ('色版' + (i + 1) + '木板'),
       color: layer.color || meta.color || '#191512',
       textColor: layer.textColor || meta.textColor || '#ffffff',
@@ -875,11 +901,13 @@ function normalizeSavedLayers(rawLayers, workId) {
 function buildAdvancedWorkFromRecord(record, ordinal = 3) {
   const layers = Array.isArray(record && record.layers) ? record.layers : [];
   const sourceOf = (layer) => (layer && (layer.fileID || layer.tempPath)) || '';
+  const boardSourceOf = (layer) => (layer && (layer.boardFileID || layer.boardTempPath || layer.fileID || layer.tempPath)) || '';
   const cleanTitle = String((record && record.title) || '数字二创').replace(/^作品\d+\s*·\s*/, '');
 
   const steps = layers.map((layer, idx) => {
     const fallbackMeta = FOSHAN_BLOCK_META[idx] || FOSHAN_BLOCK_META[FOSHAN_BLOCK_META.length - 1];
     const imgSrc = sourceOf(layer);
+    const boardSrc = boardSourceOf(layer) || imgSrc;
     const key = layer.key || fallbackMeta.key || ('plate_' + (idx + 1));
     return {
       key,
@@ -891,7 +919,7 @@ function buildAdvancedWorkFromRecord(record, ordinal = 3) {
       material: layer.material || fallbackMeta.material || '矿物颜料',
       purpose: layer.purpose || fallbackMeta.purpose || '套印色版',
       desc: layer.desc || fallbackMeta.desc,
-      boardImage: imgSrc,
+      boardImage: boardSrc,
       layerImage: imgSrc,
       modelFileID: '',
       isUserCarvedBoard: true
@@ -949,7 +977,7 @@ function setStorageListSafe(key, list) {
 function saveWorkToDualStores(splitResult, options = {}) {
   const timestamp = Date.now();
   const workId = options.id || ('user_' + timestamp);
-  purgeStaleUserFiles(false, workId);
+  purgeStaleUserFiles(true, workId);
   const savedLayers = normalizeSavedLayers((splitResult && splitResult.layers) || [], workId);
 
   if (savedLayers.length === 0) {

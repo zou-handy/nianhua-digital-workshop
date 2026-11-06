@@ -864,6 +864,180 @@ function separateRgbaToWoodblockPlates(rgba, width, height, options = {}) {
     if (cleanedLabels[i] >= 0) totalForeground++;
   }
 
+/**
+ * 根据分色标签矩阵生成「打磨梨木 + 无色区凹陷铲底刀痕 + 有色区阳刻凸起受墨」的雕版实物图 (RGBA)
+ * 自动按 maxBoardDim (默认 240px) 采样输出，兼顾细腻阳刻刀痕与极小文件体积
+ */
+function generateCarvedWoodblockPngBuffer(cleanedLabels, plateIndex, plateRgb, srcWidth, srcHeight, maxBoardDim = 240) {
+  const scale = Math.min(1, maxBoardDim / Math.max(srcWidth, srcHeight));
+  const width = Math.max(64, Math.round(srcWidth * scale));
+  const height = Math.max(64, Math.round(srcHeight * scale));
+  const total = width * height;
+
+  // 若进行了尺寸缩比，先映射缩放后的标签矩阵
+  let labels = cleanedLabels;
+  if (width !== srcWidth || height !== srcHeight) {
+    labels = new Int8Array(total);
+    for (let y = 0; y < height; y++) {
+      const sy = Math.min(srcHeight - 1, Math.floor(y / scale));
+      const sRow = sy * srcWidth;
+      const dRow = y * width;
+      for (let x = 0; x < width; x++) {
+        const sx = Math.min(srcWidth - 1, Math.floor(x / scale));
+        labels[dRow + x] = cleanedLabels[sRow + sx];
+      }
+    }
+  }
+
+  const out = new Uint8Array(total * 4);
+  const bevel = Math.max(4, Math.round(Math.min(width, height) * 0.026));
+  const cornerR = Math.max(5, Math.round(Math.min(width, height) * 0.035));
+
+  const xWave = new Float32Array(width);
+  const xGouge = new Float32Array(width);
+  const xSheen = new Float32Array(width);
+  for (let x = 0; x < width; x++) {
+    xWave[x] = Math.sin(x * 0.032) * 4.2 + Math.cos(x * 0.082) * 1.8;
+    xGouge[x] = Math.sin(x * 0.22) * 2.6;
+    xSheen[x] = Math.cos((x / width - 0.34) * 2.1) * 13;
+  }
+
+  const ySheen = new Float32Array(height);
+  for (let y = 0; y < height; y++) {
+    ySheen[y] = Math.cos((y / height - 0.30) * 2.1);
+  }
+
+  const fiberLen = (height + 32) * 4;
+  const fiberLut = new Float32Array(fiberLen);
+  for (let k = 0; k < fiberLen; k++) {
+    const yf = k * 0.25;
+    fiberLut[k] = Math.sin(yf * 0.65) * 6.8 + Math.cos(yf * 1.65) * 3.2 + Math.sin(yf * 0.16) * 8.4;
+  }
+
+  const pr = plateRgb[0], pg = plateRgb[1], pb = plateRgb[2];
+  const isInkPlate = plateIndex === 0;
+
+  for (let y = 0; y < height; y++) {
+    const rowOffset = y * width;
+    const ys = ySheen[y];
+    const inTopBevel = y < bevel;
+    const inBottomBevel = y >= height - bevel;
+
+    for (let x = 0; x < width; x++) {
+      const idx = rowOffset + x;
+      const outIdx = idx * 4;
+
+      let dx = 0, dy = 0;
+      if (x < cornerR && y < cornerR) { dx = cornerR - x; dy = cornerR - y; }
+      else if (x >= width - cornerR && y < cornerR) { dx = x - (width - 1 - cornerR); dy = cornerR - y; }
+      else if (x < cornerR && y >= height - cornerR) { dx = cornerR - x; dy = y - (height - 1 - cornerR); }
+      else if (x >= width - cornerR && y >= height - cornerR) { dx = x - (width - 1 - cornerR); dy = y - (height - 1 - cornerR); }
+      if (dx > 0 && dy > 0 && (dx * dx + dy * dy > cornerR * cornerR)) {
+        out[outIdx + 3] = 0;
+        continue;
+      }
+
+      const lutIdx = clamp(Math.round((y + 12 + xWave[x]) * 4), 0, fiberLen - 1);
+      const grain = fiberLut[lutIdx];
+      const sheen = xSheen[x] * ys;
+      const inLeftBevel = x < bevel;
+      const inRightBevel = x >= width - bevel;
+
+      if (inTopBevel || inBottomBevel || inLeftBevel || inRightBevel) {
+        let bevelLight = 0;
+        if (inTopBevel || inLeftBevel) bevelLight += 24;
+        if (inBottomBevel || inRightBevel) bevelLight -= 36;
+        if ((inTopBevel && inLeftBevel)) bevelLight += 10;
+        if ((inBottomBevel && inRightBevel)) bevelLight -= 12;
+
+        const dEdge = Math.min(x, width - 1 - x, y, height - 1 - y);
+        const rimLine = dEdge === bevel - 1 ? -18 : 0;
+        const delta = grain * 0.72 + sheen * 0.65 + bevelLight + rimLine;
+
+        out[outIdx] = clamp(Math.round(114 + delta), 24, 235);
+        out[outIdx + 1] = clamp(Math.round(66 + delta * 0.68), 14, 185);
+        out[outIdx + 2] = clamp(Math.round(35 + delta * 0.45), 8, 130);
+        out[outIdx + 3] = 255;
+        continue;
+      }
+
+      const raised = labels[idx] === plateIndex;
+      if (raised) {
+        const tlRecessed = (labels[idx - width - 1] !== plateIndex)
+          || (labels[idx - width] !== plateIndex)
+          || (labels[idx - 1] !== plateIndex);
+        const brRecessed = (labels[idx + width + 1] !== plateIndex)
+          || (labels[idx + width] !== plateIndex)
+          || (labels[idx + 1] !== plateIndex);
+
+        const woodMod = grain * 0.55 + sheen * 0.42;
+        let r = pr * 0.86 + (118 + woodMod) * 0.14 + woodMod * 0.45;
+        let g = pg * 0.86 + (70 + woodMod * 0.7) * 0.14 + woodMod * 0.38;
+        let b = pb * 0.86 + (38 + woodMod * 0.45) * 0.14 + woodMod * 0.30;
+
+        if (tlRecessed) {
+          if (isInkPlate) {
+            r += 62; g += 40; b += 22;
+          } else {
+            r += 38; g += 32; b += 24;
+          }
+        } else if (brRecessed) {
+          r -= 20; g -= 18; b -= 14;
+        }
+
+        out[outIdx] = clamp(Math.round(r), 12, 252);
+        out[outIdx + 1] = clamp(Math.round(g), 10, 248);
+        out[outIdx + 2] = clamp(Math.round(b), 8, 240);
+        out[outIdx + 3] = 255;
+        continue;
+      }
+
+      const gougeRipple = Math.sin((y + (x >> 2)) * 0.72 + xGouge[x]) * 4.8;
+      let recessDelta = grain * 0.88 + sheen * 0.55 + gougeRipple;
+
+      if (x <= bevel + 2 || y <= bevel + 2) {
+        recessDelta -= (x === bevel || y === bevel) ? 34 : 18;
+      } else if (x >= width - bevel - 2 || y >= height - bevel - 2) {
+        recessDelta += 12;
+      }
+
+      const ul1 = (labels[idx - width - 1] === plateIndex)
+        || (labels[idx - width] === plateIndex)
+        || (labels[idx - 1] === plateIndex);
+      const ul2 = !ul1 && x > bevel + 1 && y > bevel + 1 && (
+        labels[idx - width * 2 - 2] === plateIndex ||
+        labels[idx - width * 2 - 1] === plateIndex ||
+        labels[idx - width - 2] === plateIndex
+      );
+      const ul3 = !ul1 && !ul2 && x > bevel + 2 && y > bevel + 2 && (
+        labels[idx - width * 3 - 3] === plateIndex ||
+        labels[idx - width * 2 - 3] === plateIndex ||
+        labels[idx - width * 3 - 2] === plateIndex
+      );
+
+      const dr1 = (labels[idx + width + 1] === plateIndex)
+        || (labels[idx + width] === plateIndex)
+        || (labels[idx + 1] === plateIndex);
+      const dr2 = !dr1 && x < width - bevel - 2 && y < height - bevel - 2 && (
+        labels[idx + width * 2 + 2] === plateIndex
+      );
+
+      if (ul1) recessDelta -= 44;
+      else if (ul2) recessDelta -= 28;
+      else if (ul3) recessDelta -= 14;
+      else if (dr1) recessDelta += 22;
+      else if (dr2) recessDelta += 10;
+
+      out[outIdx] = clamp(Math.round(86 + recessDelta), 18, 210);
+      out[outIdx + 1] = clamp(Math.round(48 + recessDelta * 0.64), 10, 155);
+      out[outIdx + 2] = clamp(Math.round(25 + recessDelta * 0.42), 5, 105);
+      out[outIdx + 3] = 255;
+    }
+  }
+
+  return encodeRgbaToPngArrayBuffer(out, width, height);
+}
+
   for (let c = 0; c < numPlates; c++) {
     const meta = activePlates[c];
     const layerRgba = new Uint8Array(total * 4);
@@ -893,7 +1067,8 @@ function separateRgbaToWoodblockPlates(rgba, width, height, options = {}) {
       rgb: meta.rgb,
       pixelCount,
       coverageRatio: totalForeground > 0 ? Number((pixelCount / totalForeground).toFixed(4)) : 0,
-      pngArrayBuffer: encodeRgbaToPngArrayBuffer(layerRgba, width, height)
+      pngArrayBuffer: encodeRgbaToPngArrayBuffer(layerRgba, width, height),
+      boardPngArrayBuffer: generateCarvedWoodblockPngBuffer(cleanedLabels, c, meta.rgb, width, height, 200)
     });
   }
 
