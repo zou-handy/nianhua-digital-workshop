@@ -142,6 +142,43 @@
           <view class="s1-wood-bar"></view>
         </view>
 
+        <!-- ═══════════ 首页下方 · 实拍制版与 AI 数字二创入口 ═══════════ -->
+        <view class="s1-creator-dock" bindtap="openAdvancedCreator">
+          <view class="s1-creator-kicker-row">
+            <view class="s1-creator-kicker-line"></view>
+            <text class="s1-creator-kicker-text">实拍制版 · AI 数字工坊 · 直通卷五版台</text>
+            <view class="s1-creator-kicker-line s1-creator-kicker-line-r"></view>
+          </view>
+          <view class="s1-creator-card">
+            <view class="s1-creator-corner s1-creator-corner-tl"></view>
+            <view class="s1-creator-corner s1-creator-corner-tr"></view>
+            <view class="s1-creator-corner s1-creator-corner-bl"></view>
+            <view class="s1-creator-corner s1-creator-corner-br"></view>
+
+            <view class="s1-creator-emblem">
+              <view class="s1-creator-seal-box">
+                <text class="s1-creator-seal-char">创</text>
+              </view>
+              <view class="s1-creator-dots">
+                <view class="s1-creator-dot" style="background:#3A322D;"></view>
+                <view class="s1-creator-dot" style="background:#D42F2F;"></view>
+                <view class="s1-creator-dot" style="background:#E6A817;"></view>
+                <view class="s1-creator-dot" style="background:#5396AC;"></view>
+              </view>
+            </view>
+
+            <view class="s1-creator-main">
+              <text class="s1-creator-title">拍照转年画 & AI 主题生图</text>
+              <text class="s1-creator-desc">实拍直转多色雕版 · 主题生成装入卷五</text>
+            </view>
+
+            <view class="s1-creator-cta" catchtap="openAdvancedPhotoCreator">
+              <text class="s1-creator-cta-text">立即制版</text>
+              <text class="s1-creator-cta-arrow">›</text>
+            </view>
+          </view>
+        </view>
+
         <view class="s1-bottom">
           <view class="scroll-arrow">
             <text class="arrow-text">↓</text>
@@ -327,14 +364,6 @@
             <text class="screen-label">版 台</text>
             <text class="screen-heading">分色木板</text>
           </view>
-          <view class="advanced-header-actions">
-            <view class="advanced-quick-btn advanced-quick-btn-camera" bindtap="openAdvancedPhotoCreator">
-              <text class="advanced-quick-btn-text">拍照制版</text>
-            </view>
-            <view class="advanced-quick-btn" bindtap="openAdvancedCreator">
-              <text class="advanced-quick-btn-text">AI 二创</text>
-            </view>
-          </view>
         </view>
 
         <view class="advanced-source-strip">
@@ -453,23 +482,6 @@
           <text class="advanced-info-title">{{advancedActiveBlock.name}}</text>
           <text class="advanced-info-desc">{{advancedActiveBlock.desc}}</text>
           <text class="advanced-info-3d">选择木板后，点击台上木板查看 3D 特写</text>
-        </view>
-
-        <view class="volume-five-experiences">
-          <view class="volume-five-heading">
-            <text class="volume-five-kicker">版外观摩 · 实拍制版</text>
-            <text class="volume-five-title">从实拍照片或 AI 走向木版套印</text>
-          </view>
-          <view class="volume-five-actions">
-            <view class="volume-five-action volume-five-action-wide" bindtap="openAdvancedCreator">
-              <view class="volume-five-action-mark">创</view>
-              <view class="volume-five-action-copy">
-                <text class="volume-five-action-title">拍照转年画 & AI 数字二创</text>
-                <text class="volume-five-action-desc">支持拍照/相册实拍图直转四色雕版，或 AI 主题生图装入卷五</text>
-              </view>
-              <text class="volume-five-action-arrow">›</text>
-            </view>
-          </view>
         </view>
       </view>
     </swiper-item>
@@ -781,7 +793,7 @@
     <view class="advanced-creator-panel" catchtap="noop">
       <view class="advanced-creator-head">
         <view>
-          <text class="advanced-creator-kicker">卷五 · 实拍制版与数字二创</text>
+          <text class="advanced-creator-kicker">非遗数字工坊 · 实拍制版与 AI 二创</text>
           <text class="advanced-creator-title">拍照转年画 / 动态多色雕版</text>
         </view>
         <view class="advanced-creator-close" bindtap="closeAdvancedCreator">×</view>

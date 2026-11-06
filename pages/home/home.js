@@ -812,6 +812,9 @@ Page({
         this.setData({ currentPage: targetPage });
       }
     }
+    if (options && options.openCreator === '1') {
+      this.setData({ advancedCreatorOpen: true });
+    }
     this._loadAdvancedUserWorks();
     this.bgMusic = wx.createInnerAudioContext();
     this.preloadToolImages();
@@ -1818,10 +1821,16 @@ Page({
   },
 
   openAdvancedCreator() {
+    if (this.data.openingEffectVisible) {
+      this._hideOpeningEffect(false);
+    }
     this.setData({ advancedCreatorOpen: true });
   },
 
   openAdvancedPhotoCreator() {
+    if (this.data.openingEffectVisible) {
+      this._hideOpeningEffect(false);
+    }
     this.setData({ advancedCreatorOpen: true }, () => {
       this.chooseAdvancedCreatorImage();
     });
@@ -2039,10 +2048,16 @@ Page({
       var workIndex = runtimeAdvancedPrintSets.findIndex(function(item) {
         return item && item.id === saved.advancedWork.id;
       });
-      this.setData({ advancedCreatorOpen: false });
+      this.setData({
+        advancedCreatorOpen: false,
+        currentPage: 4
+      }, () => {
+        var aiFloat = this.selectComponent('#aiFloat');
+        if (aiFloat) aiFloat.setPageContext({ chapter: '版台' });
+      });
       if (workIndex > -1) {
         this.switchAdvancedWork({ currentTarget: { dataset: { index: workIndex } } });
-        wx.showToast({ title: (saved.advancedWork.steps.length || 4) + '块雕版已装入版台', icon: 'success' });
+        wx.showToast({ title: (saved.advancedWork.steps.length || 4) + '块雕版已装入卷五版台', icon: 'success' });
       }
     } catch (err) {
       console.error('[卷五二创] 分色失败:', err);
