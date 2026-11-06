@@ -2773,7 +2773,7 @@ page {
   width: 500rpx;
   height: 392rpx;
   border-radius: 12rpx;
-  overflow: hidden;
+  overflow: visible;
   background:
     linear-gradient(90deg, rgba(80, 35, 10, 0.05), transparent 28%, rgba(255, 255, 255, 0.18) 50%, transparent 72%, rgba(80, 35, 10, 0.06)),
     #F3E4C4;
@@ -2787,6 +2787,13 @@ page {
   transition: box-shadow 0.55s ease, border-color 0.55s ease;
 }
 
+.s1-paper-surface {
+  position: absolute;
+  inset: 0;
+  border-radius: 12rpx;
+  overflow: hidden;
+}
+
 .s1-paper.s1-paper-awakened {
   border-color: rgba(242, 201, 76, 0.78);
   box-shadow:
@@ -2795,7 +2802,104 @@ page {
     inset 0 0 46rpx rgba(212, 47, 47, 0.12),
     0 28rpx 72rpx rgba(0, 0, 0, 0.56),
     0 0 44rpx rgba(230, 168, 23, 0.36);
-  animation: s1PaperAwakenFloat 4.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: s1PaperAwakenFloat 3.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── 纯代码驱动 2D 门神木偶关节动画舞台 ── */
+.s1-puppet-stage {
+  position: absolute;
+  left: -8rpx;
+  right: -8rpx;
+  top: -16rpx;
+  bottom: -14rpx;
+  z-index: 14;
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: 50% 88%;
+  transform: translateY(42rpx) scale(0.56);
+  filter: drop-shadow(0 16rpx 26rpx rgba(24, 10, 4, 0.44));
+}
+
+.s1-puppet-stage.is-active {
+  animation: s1PuppetStageLifecycle 3.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.s1-puppet-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.s1-puppet-grip {
+  z-index: 1;
+  opacity: 0;
+}
+
+.s1-puppet-stage.is-active .s1-puppet-grip {
+  animation: s1PuppetGripPose 3.8s ease-in-out both;
+}
+
+.s1-puppet-wave-group {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0;
+}
+
+.s1-puppet-stage.is-active .s1-puppet-wave-group {
+  animation: s1PuppetWaveGroupPose 3.8s ease-in-out both;
+}
+
+.s1-puppet-body {
+  z-index: 1;
+}
+
+.s1-puppet-smile {
+  z-index: 2;
+  opacity: 0;
+}
+
+.s1-puppet-stage.is-active .s1-puppet-smile {
+  animation: s1PuppetSmileBlink 3.8s ease-in-out both;
+}
+
+.s1-puppet-arm {
+  z-index: 3;
+  transform-origin: 25.1% 75.8%;
+}
+
+.s1-puppet-stage.is-active .s1-puppet-arm {
+  animation: s1PuppetArmWave 3.8s ease-in-out both;
+}
+
+.s1-puppet-greet-bubble {
+  position: absolute;
+  left: 14rpx;
+  top: 64rpx;
+  z-index: 5;
+  padding: 8rpx 18rpx;
+  border-radius: 24rpx 24rpx 24rpx 4rpx;
+  background: linear-gradient(135deg, #C41E3A 0%, #8E1428 100%);
+  border: 2rpx solid #FFE082;
+  box-shadow:
+    0 8rpx 20rpx rgba(196, 30, 58, 0.45),
+    0 0 16rpx rgba(242, 201, 76, 0.55);
+  opacity: 0;
+  transform-origin: left bottom;
+  transform: translateY(14rpx) scale(0.75);
+}
+
+.s1-puppet-stage.is-active .s1-puppet-greet-bubble {
+  animation: s1PuppetGreetBubble 3.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.s1-puppet-greet-text {
+  font-size: 20rpx;
+  color: #FFFDF5;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  white-space: nowrap;
 }
 
 .s1-gold-corners {
@@ -2892,20 +2996,11 @@ page {
   animation: s1LayerPrint 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.s1-awakening-active .s1-layer-0 {
-  animation: s1LayerAwakenInk 4.2s cubic-bezier(0.22, 1, 0.36, 1) both !important;
-}
-
-.s1-awakening-active .s1-layer-1 {
-  animation: s1LayerAwakenRed 4.2s cubic-bezier(0.22, 1, 0.36, 1) both !important;
-}
-
-.s1-awakening-active .s1-layer-2 {
-  animation: s1LayerAwakenYellow 4.2s cubic-bezier(0.22, 1, 0.36, 1) both !important;
-}
-
+.s1-awakening-active .s1-layer-0,
+.s1-awakening-active .s1-layer-1,
+.s1-awakening-active .s1-layer-2,
 .s1-awakening-active .s1-layer-3 {
-  animation: s1LayerAwakenGreen 4.2s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+  animation: s1LayerAwakenPopAndRestore 3.8s cubic-bezier(0.22, 1, 0.36, 1) both !important;
 }
 
 .s1-ink-sweep {
@@ -3412,18 +3507,123 @@ page {
   }
 }
 
-@keyframes s1LayerAwakenInk {
-  0%, 100% {
+@keyframes s1LayerAwakenPopAndRestore {
+  0% {
     opacity: 0.96;
     transform: translate(-50%, -50%) scale(1);
   }
-  34% {
-    opacity: 1;
-    transform: translate(-50%, -53.5%) scale(1.038);
+  12% {
+    opacity: 0.04;
+    transform: translate(-50%, -44%) scale(1.26);
   }
-  68% {
-    opacity: 0.98;
-    transform: translate(-50%, -51.2%) scale(1.012);
+  78% {
+    opacity: 0.04;
+    transform: translate(-50%, -44%) scale(1.26);
+  }
+  95%, 100% {
+    opacity: 0.96;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes s1PuppetStageLifecycle {
+  0% {
+    opacity: 0;
+    transform: translateY(42rpx) scale(0.56);
+  }
+  13% {
+    opacity: 1;
+    transform: translateY(-4rpx) scale(1.03);
+  }
+  20%, 76% {
+    opacity: 1;
+    transform: translateY(0rpx) scale(1);
+  }
+  84% {
+    opacity: 1;
+    transform: translateY(4rpx) scale(0.95);
+  }
+  96%, 100% {
+    opacity: 0;
+    transform: translateY(40rpx) scale(0.56);
+  }
+}
+
+@keyframes s1PuppetGripPose {
+  0%, 13% {
+    opacity: 1;
+  }
+  18%, 75% {
+    opacity: 0;
+  }
+  80%, 100% {
+    opacity: 1;
+  }
+}
+
+@keyframes s1PuppetWaveGroupPose {
+  0%, 12% {
+    opacity: 0;
+  }
+  17%, 76% {
+    opacity: 1;
+  }
+  81%, 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes s1PuppetArmWave {
+  0%, 14% {
+    transform: rotate(-16deg) scale(0.94);
+  }
+  24% {
+    transform: rotate(13deg) scale(1.02);
+  }
+  34% {
+    transform: rotate(-12deg) scale(1);
+  }
+  44% {
+    transform: rotate(15deg) scale(1.03);
+  }
+  54% {
+    transform: rotate(-11deg) scale(1);
+  }
+  64% {
+    transform: rotate(13deg) scale(1.02);
+  }
+  73% {
+    transform: rotate(-9deg) scale(0.98);
+  }
+  80%, 100% {
+    transform: rotate(-18deg) scale(0.92);
+  }
+}
+
+@keyframes s1PuppetSmileBlink {
+  0%, 20% {
+    opacity: 0;
+  }
+  26%, 70% {
+    opacity: 1;
+  }
+  76%, 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes s1PuppetGreetBubble {
+  0%, 18% {
+    opacity: 0;
+    transform: translateY(14rpx) scale(0.72);
+  }
+  26%, 70% {
+    opacity: 1;
+    transform: translateY(0rpx) scale(1);
+  }
+  78%, 100% {
+    opacity: 0;
+    transform: translateY(10rpx) scale(0.8);
   }
 }
 
@@ -3452,24 +3652,6 @@ page {
   }
 }
 
-@keyframes s1OrbitSpinA {
-  0% {
-    transform: rotate(-22deg) rotateZ(0deg);
-  }
-  100% {
-    transform: rotate(-22deg) rotateZ(360deg);
-  }
-}
-
-@keyframes s1OrbitSpinB {
-  0% {
-    transform: rotate(26deg) rotateZ(360deg);
-  }
-  100% {
-    transform: rotate(26deg) rotateZ(0deg);
-  }
-}
-
 @keyframes s1SparkFloat {
   0% {
     opacity: 0;
@@ -3486,51 +3668,6 @@ page {
   100% {
     opacity: 0;
     transform: translateY(-96rpx) rotate(180deg) scale(0.35);
-  }
-}
-
-@keyframes s1LayerAwakenRed {
-  0%, 100% {
-    opacity: 0.96;
-    transform: translate(-50%, -50%) scale(1);
-  }
-  34% {
-    opacity: 0.98;
-    transform: translate(-52%, -48.5%) scale(0.988);
-  }
-  68% {
-    opacity: 0.97;
-    transform: translate(-50.5%, -49.5%) scale(0.996);
-  }
-}
-
-@keyframes s1LayerAwakenYellow {
-  0%, 100% {
-    opacity: 0.96;
-    transform: translate(-50%, -50%) scale(1);
-  }
-  34% {
-    opacity: 1;
-    transform: translate(-48%, -52.5%) scale(1.024);
-  }
-  68% {
-    opacity: 0.98;
-    transform: translate(-49.5%, -50.8%) scale(1.008);
-  }
-}
-
-@keyframes s1LayerAwakenGreen {
-  0%, 100% {
-    opacity: 0.96;
-    transform: translate(-50%, -50%) scale(1);
-  }
-  34% {
-    opacity: 0.98;
-    transform: translate(-51.2%, -51.8%) scale(1.012);
-  }
-  68% {
-    opacity: 0.97;
-    transform: translate(-50.2%, -50.4%) scale(1.004);
   }
 }
 

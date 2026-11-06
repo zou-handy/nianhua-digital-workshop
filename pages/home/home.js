@@ -1086,12 +1086,12 @@ Page({
       openingEffectVisible: true,
       openingEffectPlaying: true,
       openingActiveStep: 3,
-      openingStageBadge: '伍 · 勾线描金 · 灵韵开相'
+      openingStageBadge: '伍 · 破框迎客 · 门神问好'
     }, () => {
       this._startOpeningAwakeningCanvas();
       this._openingVideoFinishTimer = setTimeout(() => {
         this._hideOpeningEffect(true);
-      }, 4800);
+      }, 3800);
     });
   },
 
@@ -1109,7 +1109,7 @@ Page({
     this.setData({
       openingEffectVisible: false,
       openingEffectPlaying: false,
-      openingStageBadge: keepBadge ? '四版套印 · 描金礼成' : ''
+      openingStageBadge: keepBadge ? '四版套印 · 礼成归位' : ''
     });
   },
 
