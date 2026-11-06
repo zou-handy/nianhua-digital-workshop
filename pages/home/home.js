@@ -700,6 +700,7 @@ Page({
     advancedCreatorGenerating: false,
     advancedCreatorSplitting: false,
     advancedCreatorStage: '',
+    advancedCreatorStepIndex: 0,
     advancedCreatorWorkingText: '',
     xiaonianWorkingImage: XIAONIAN_WORKING_IMAGE,
 
@@ -1839,25 +1840,29 @@ Page({
   _startCreatorWorking(stage) {
     clearInterval(this._creatorWorkingTimer);
     var messages = stage === 'generating'
-      ? ['小年正在起稿构图', '正在铺设朱红与石黄', '正在补上青绿与墨线', '正在检查色块边界']
+      ? ['小年正在审题起稿构图', '正在松烟墨刀刻勾勒主骨', '正在敷设朱红、石黄与石绿矿物色', '正在校准宣纸留白与套印规矩']
       : stage === 'assembling'
-        ? ['小年正在装配 2.5D 雕版', '正在把四色木板装入卷五版台']
+        ? ['小年正在装配 2.5D 梨木雕版', '正在把多色木版装入卷五版台']
         : ['正在保边去噪与宣纸留白分割', '正在提取松烟墨线主骨版', '正在量化朱红、石黄、青绿矿物色版', '正在连通域去杂点并校准套印位置'];
     var index = 0;
     this.setData({
       advancedCreatorStage: stage,
+      advancedCreatorStepIndex: 0,
       advancedCreatorWorkingText: messages[0]
     });
     this._creatorWorkingTimer = setInterval(() => {
       index = (index + 1) % messages.length;
-      this.setData({ advancedCreatorWorkingText: messages[index] });
-    }, 2200);
+      this.setData({
+        advancedCreatorStepIndex: index,
+        advancedCreatorWorkingText: messages[index]
+      });
+    }, 2000);
   },
 
   _stopCreatorWorking() {
     clearInterval(this._creatorWorkingTimer);
     this._creatorWorkingTimer = null;
-    this.setData({ advancedCreatorStage: '', advancedCreatorWorkingText: '' });
+    this.setData({ advancedCreatorStage: '', advancedCreatorStepIndex: 0, advancedCreatorWorkingText: '' });
   },
 
   closeAdvancedCreator() {
@@ -2078,9 +2083,20 @@ Page({
       return filePath;
     }
 
+    if (/^http:\/\/(tmp|usr)\//i.test(filePath)) {
+      return this._uploadOrEncodeCreatorSource(filePath);
+    }
+
     if (/^https?:\/\//i.test(filePath)) {
-      var tempFilePath = await this._downloadAdvancedCreatorImage(filePath);
-      return this._uploadOrEncodeCreatorSource(tempFilePath);
+      if (/\.tcb\.qcloud\.la\//i.test(filePath)) {
+        try {
+          var tempFilePath = await this._downloadAdvancedCreatorImage(filePath);
+          return await this._uploadOrEncodeCreatorSource(tempFilePath);
+        } catch (dlErr) {
+          console.warn('[卷五二创] 临时链接本地下载跳过，直接透传 URL:', dlErr);
+        }
+      }
+      return filePath;
     }
 
     return this._uploadOrEncodeCreatorSource(filePath);

@@ -838,18 +838,102 @@
         </view>
       </view>
       <view wx:if="{{advancedCreatorGenerating || advancedCreatorSplitting}}" class="advanced-creator-working">
+        <view class="working-corner working-corner-tl"></view>
+        <view class="working-corner working-corner-tr"></view>
+        <view class="working-corner working-corner-bl"></view>
+        <view class="working-corner working-corner-br"></view>
+
+        <view class="working-studio-header">
+          <view class="working-studio-status">
+            <view class="working-status-dot"></view>
+            <text class="working-status-kicker">{{advancedCreatorStage==='generating'?'小年丹青画坊 · 宣纸绘稿':(advancedCreatorStage==='assembling'?'小年制版工坊 · 雕版入台':'小年制版工坊 · 刀木分色')}}</text>
+          </view>
+          <text class="working-studio-tag">松烟墨 · 矿物套色</text>
+        </view>
+
         <view class="advanced-working-scene">
-          <view class="advanced-working-board advanced-working-board-black"></view>
-          <view class="advanced-working-board advanced-working-board-red"></view>
-          <view class="advanced-working-board advanced-working-board-yellow"></view>
-          <view class="advanced-working-board advanced-working-board-green"></view>
-          <view class="advanced-working-avatar-wrap">
-            <image class="advanced-working-avatar" src="{{xiaonianWorkingImage}}" mode="aspectFill"></image>
-            <view class="advanced-working-hand"></view>
+          <!-- 左侧：小年匠人徽章与四色矿物颜料碟 -->
+          <view class="working-xiaonian-station">
+            <view class="advanced-working-avatar-wrap">
+              <view class="working-avatar-halo"></view>
+              <image class="advanced-working-avatar" src="{{xiaonianWorkingImage}}" mode="aspectFill"></image>
+              <view class="working-avatar-seal">{{advancedCreatorStage==='generating'?'绘':'刻'}}</view>
+            </view>
+            <view class="working-pigment-tray">
+              <view class="working-pigment-dish working-pigment-black"><text>墨</text></view>
+              <view class="working-pigment-dish working-pigment-red"><text>丹</text></view>
+              <view class="working-pigment-dish working-pigment-yellow"><text>黄</text></view>
+              <view class="working-pigment-dish working-pigment-green"><text>青</text></view>
+            </view>
+          </view>
+
+          <!-- 右侧：2.5D 梨木画案 + 宣纸四色套印动态层 + 狼毫画笔轨迹 -->
+          <view class="working-easel-stage">
+            <view class="working-easel-wood">
+              <view class="working-xuan-paper">
+                <view class="working-paper-grid"></view>
+                <view class="working-reg-mark working-reg-tl">┼</view>
+                <view class="working-reg-mark working-reg-tr">┼</view>
+                <view class="working-reg-mark working-reg-bl">┼</view>
+                <view class="working-reg-mark working-reg-br">┼</view>
+
+                <!-- 四色木版依次套印显影层 -->
+                <view class="advanced-working-board advanced-working-board-black">
+                  <view class="working-plate-motif working-motif-ink"></view>
+                </view>
+                <view class="advanced-working-board advanced-working-board-red">
+                  <view class="working-plate-motif working-motif-red"></view>
+                </view>
+                <view class="advanced-working-board advanced-working-board-yellow">
+                  <view class="working-plate-motif working-motif-yellow"></view>
+                </view>
+                <view class="advanced-working-board advanced-working-board-green">
+                  <view class="working-plate-motif working-motif-green"></view>
+                </view>
+
+                <!-- 金光扫描流光 -->
+                <view class="working-scan-beam"></view>
+              </view>
+            </view>
+
+            <!-- 狼毫丹青笔 + 墨韵轨迹 + 飞金粒子 -->
+            <view class="working-ink-trail"></view>
+            <view class="working-brush-rig">
+              <view class="working-brush-shaft"></view>
+              <view class="working-brush-ferrule"></view>
+              <view class="working-brush-tip"></view>
+            </view>
+            <view class="working-spark working-spark-1"></view>
+            <view class="working-spark working-spark-2"></view>
+            <view class="working-spark working-spark-3"></view>
           </view>
         </view>
+
         <text class="advanced-working-title">{{advancedCreatorWorkingText}}</text>
         <text class="advanced-working-sub">{{advancedCreatorStage==='generating'?'正在提取刀刻墨线与矿物平涂色块':(advancedCreatorStage==='assembling'?'多色雕版即将放入卷五版台':'正在动态拆解松烟墨与矿物色版')}}</text>
+
+        <view class="working-steps-bar">
+          <view class="working-step-pill {{advancedCreatorStepIndex >= 0 ? 'working-step-active' : ''}}">
+            <text class="working-step-num">壹</text>
+            <text class="working-step-text">{{advancedCreatorStage==='generating'?'立意起稿':'去底留白'}}</text>
+          </view>
+          <view class="working-step-line {{advancedCreatorStepIndex >= 1 ? 'working-step-line-active' : ''}}"></view>
+          <view class="working-step-pill {{advancedCreatorStepIndex >= 1 ? 'working-step-active' : ''}}">
+            <text class="working-step-num">贰</text>
+            <text class="working-step-text">松烟勾骨</text>
+          </view>
+          <view class="working-step-line {{advancedCreatorStepIndex >= 2 ? 'working-step-line-active' : ''}}"></view>
+          <view class="working-step-pill {{advancedCreatorStepIndex >= 2 ? 'working-step-active' : ''}}">
+            <text class="working-step-num">叁</text>
+            <text class="working-step-text">{{advancedCreatorStage==='generating'?'矿物敷彩':'多版分色'}}</text>
+          </view>
+          <view class="working-step-line {{advancedCreatorStepIndex >= 3 ? 'working-step-line-active' : ''}}"></view>
+          <view class="working-step-pill {{advancedCreatorStepIndex >= 3 ? 'working-step-active' : ''}}">
+            <text class="working-step-num">肆</text>
+            <text class="working-step-text">{{advancedCreatorStage==='generating'?'宣纸成画':'校准装台'}}</text>
+          </view>
+        </view>
+
         <view class="advanced-working-progress">
           <view class="advanced-working-progress-fill"></view>
         </view>

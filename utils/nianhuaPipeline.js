@@ -172,6 +172,10 @@ function writeUserFileSafe(filePath, arrayBuffer, keepToken = '') {
   }
 }
 
+function isWhitelistedDownloadUrl(src) {
+  return /\.tcb\.qcloud\.la\//i.test(String(src || ''));
+}
+
 function resolveLocalImagePathForCanvas(imageSource) {
   return new Promise((resolve, reject) => {
     if (!imageSource) {
@@ -198,6 +202,11 @@ function resolveLocalImagePathForCanvas(imageSource) {
       return;
     }
     if (/^https?:\/\//i.test(src) && !/^http:\/\/(usr|tmp)\//i.test(src)) {
+      if (!isWhitelistedDownloadUrl(src)) {
+        // 外部 COS/HTTP 链接不在小程序 downloadFile 合法域名列表时，跳过 getImageInfo/downloadFile，直接交由 OffscreenCanvas Image 加载
+        resolve(src);
+        return;
+      }
       wx.getImageInfo({
         src,
         success: (res) => {
@@ -217,14 +226,44 @@ function resolveLocalImagePathForCanvas(imageSource) {
   });
 }
 
+function isRemoteNonWhitelistedUrl(src) {
+  const s = String(src || '');
+  return /^https?:\/\//i.test(s) && !/^http:\/\/(usr|tmp)\//i.test(s) && !isWhitelistedDownloadUrl(s);
+}
+
 function loadCanvasImageWithFallback(canvas, localPath, originalSource) {
   return new Promise((resolve, reject) => {
+    if (isRemoteNonWhitelistedUrl(localPath)) {
+      reject(new Error('外部非白名单域名图片需经云函数中转分色'));
+      return;
+    }
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error('OffscreenCanvas 图片加载超时'));
+      }
+    }, 3200);
+
+    const finishResolve = (img) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(img);
+    };
+    const finishReject = (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    };
+
     const img = canvas.createImage();
     let triedDataUrl = false;
 
     const tryDataUrl = () => {
-      if (triedDataUrl) {
-        reject(new Error('OffscreenCanvas 图片解码失败'));
+      if (triedDataUrl || isRemoteNonWhitelistedUrl(localPath)) {
+        finishReject(new Error('OffscreenCanvas 图片解码失败'));
         return;
       }
       triedDataUrl = true;
@@ -238,11 +277,11 @@ function loadCanvasImageWithFallback(canvas, localPath, originalSource) {
         const ext = /\.png$/i.test(localPath) ? 'png' : 'jpeg';
         img.src = `data:image/${ext};base64,${b64}`;
       } catch (e) {
-        reject(e);
+        finishReject(e);
       }
     };
 
-    img.onload = () => resolve(img);
+    img.onload = () => finishResolve(img);
     img.onerror = () => tryDataUrl();
 
     if (typeof localPath === 'string' && localPath.startsWith('data:image/')) {
@@ -251,10 +290,9 @@ function loadCanvasImageWithFallback(canvas, localPath, originalSource) {
     } else if (typeof originalSource === 'string' && originalSource.startsWith('data:image/')) {
       triedDataUrl = true;
       img.src = originalSource;
-    } else if (String(localPath).startsWith(wx.env.USER_DATA_PATH)) {
-      tryDataUrl();
     } else {
-      img.src = localPath;
+      // 所有本地临时路径 (http://tmp/, http://usr/, wxfile://) 统一转为 Base64 DataURL 喂给 OffscreenCanvas，避免 createImage 挂起
+      tryDataUrl();
     }
   });
 }
@@ -266,7 +304,10 @@ async function runEdgeWoodblockSplit(imageSource, payload = {}) {
   const localPath = await resolveLocalImagePathForCanvas(imageSource);
   let rawW = 280;
   let rawH = 280;
-  if (!String(localPath).startsWith('data:image/')) {
+  const isRemoteNonWhitelisted = /^https?:\/\//i.test(String(localPath))
+    && !/^http:\/\/(usr|tmp)\//i.test(String(localPath))
+    && !isWhitelistedDownloadUrl(localPath);
+  if (!String(localPath).startsWith('data:image/') && !isRemoteNonWhitelisted) {
     try {
       const imgInfo = await new Promise((resolve, reject) => {
         wx.getImageInfo({
@@ -354,7 +395,7 @@ async function stylizePhotoToWoodblockNianhua(imageSource, options = {}) {
           mode: 'hy-image-3.0-i2i-woodblock',
           imageUrl: outUrl,
           localPath: outUrl,
-          fileID: fileID || '',
+          fileID: '',
           plateCount: options.maxColors || 'auto',
           splitResult: null
         };
@@ -406,6 +447,14 @@ async function requestSplitColors(imageSource, options = {}) {
     paletteLabels: options.paletteLabels || null
   };
 
+  // 1. 优先尝试毫秒级端侧 OffscreenCanvas v2.1 动态多色引擎（支持本地图、cloud://、data:image 及外部图片）
+  try {
+    return await runEdgeWoodblockSplit(imageSource, payload);
+  } catch (edgeFirstErr) {
+    console.info('[nianhuaPipeline] 端侧直连分色受限，自动切换云函数中转分色:', String(edgeFirstErr && (edgeFirstErr.message || edgeFirstErr)));
+  }
+
+  // 2. 若配置了自建 HTTP 服务则尝试 HTTP
   const baseURL = getApiBaseURL();
   const isCloudFile = typeof imageSource === 'string' && imageSource.startsWith('cloud://');
   if (baseURL && !isCloudFile) {
@@ -416,24 +465,25 @@ async function requestSplitColors(imageSource, options = {}) {
     }
   }
 
-  let cloudResult = null;
-  try {
-    cloudResult = await requestSplitColorsViaCloudFunction(payload);
-    if (cloudResult && String(cloudResult.engineVersion || '').startsWith('2.1')) {
-      return cloudResult;
-    }
-    console.info('[nianhuaPipeline] 检测到云端 splitColors 尚未升级至 2.1 动态多版引擎，自动启用端侧 v2.1 引擎');
-  } catch (cloudErr) {
-    console.warn('[nianhuaPipeline] 云函数分色不可用，自动启用端侧 v2.1 动态多版引擎:', cloudErr);
+  // 3. 调用云函数 splitColors（云端 Node.js 无域名白名单限制，可直接拉取混元 COS 等任意外部图片并转存至本环境 cloud://）
+  const cloudPayload = Object.assign({}, payload, {
+    maxDimension: 600
+  });
+  const cloudResult = await requestSplitColorsViaCloudFunction(cloudPayload);
+  if (cloudResult && String(cloudResult.engineVersion || '').startsWith('2.1')) {
+    return cloudResult;
   }
 
-  try {
-    return await runEdgeWoodblockSplit(imageSource, payload);
-  } catch (edgeErr) {
-    console.warn('[nianhuaPipeline] 端侧分色回退至云端结果:', String(edgeErr && (edgeErr.stack || edgeErr.message || edgeErr.errMsg || edgeErr)));
-    if (cloudResult) return cloudResult;
-    throw edgeErr;
+  // 4. 用云函数转存回来的本环境白名单 cloud:// 图源交由端侧 v2.1 引擎执行 3~6 版动态多色精修分色
+  const relaySource = (cloudResult && (cloudResult.quantizedFileID || cloudResult.quantizedBase64)) || '';
+  if (relaySource) {
+    try {
+      return await runEdgeWoodblockSplit(relaySource, payload);
+    } catch (edgeSecondErr) {
+      console.warn('[nianhuaPipeline] 云中转后端侧精修跳过，采用云函数结果:', edgeSecondErr);
+    }
   }
+  return cloudResult;
 }
 
 /**
@@ -797,11 +847,12 @@ function normalizeSavedLayers(rawLayers, workId) {
 
     if (!layerPath) continue;
 
+    const validName = (layer.name && !/^color_\d+$/i.test(String(layer.name))) ? layer.name : '';
     savedLayers.push({
       key: layer.key || meta.key || ('color_' + (i + 1)),
       tempPath: layerPath,
       fileID: layer.fileID || '',
-      name: layer.name || meta.name || ((layer.label || ('色版' + (i + 1))) + '木板'),
+      name: validName || (layer.label ? layer.label.replace(/版$/, '') + '木板' : '') || meta.name || ('色版' + (i + 1) + '木板'),
       color: layer.color || meta.color || '#191512',
       textColor: layer.textColor || meta.textColor || '#ffffff',
       label: layer.label || meta.label || ('图层' + (i + 1)),
