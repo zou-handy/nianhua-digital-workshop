@@ -2805,101 +2805,32 @@ page {
   animation: s1PaperAwakenFloat 3.8s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* ── 纯代码驱动 2D 门神木偶关节动画舞台 ── */
-.s1-puppet-stage {
+/* ── AI 九宫格序列帧精灵图播放器（正片叠底融入宣纸） ── */
+.s1-sprite-player {
   position: absolute;
-  left: -8rpx;
-  right: -8rpx;
-  top: -16rpx;
-  bottom: -14rpx;
-  z-index: 14;
+  inset: 0;
+  z-index: 9;
+  overflow: hidden;
   pointer-events: none;
   opacity: 0;
-  transform-origin: 50% 88%;
-  transform: translateY(42rpx) scale(0.56);
-  filter: drop-shadow(0 16rpx 26rpx rgba(24, 10, 4, 0.44));
+  mix-blend-mode: multiply;
 }
 
-.s1-puppet-stage.is-active {
-  animation: s1PuppetStageLifecycle 3.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+.s1-sprite-player.is-playing {
+  animation: s1SpritePlayerFade 3.8s ease-in-out both;
 }
 
-.s1-puppet-layer {
+.s1-sprite-strip {
   position: absolute;
-  inset: 0;
-  width: 100%;
+  left: 0;
+  top: 0;
+  width: 1200%;
   height: 100%;
+  transform: translateX(0%);
 }
 
-.s1-puppet-grip {
-  z-index: 1;
-  opacity: 0;
-}
-
-.s1-puppet-stage.is-active .s1-puppet-grip {
-  animation: s1PuppetGripPose 3.8s ease-in-out both;
-}
-
-.s1-puppet-wave-group {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  opacity: 0;
-}
-
-.s1-puppet-stage.is-active .s1-puppet-wave-group {
-  animation: s1PuppetWaveGroupPose 3.8s ease-in-out both;
-}
-
-.s1-puppet-body {
-  z-index: 1;
-}
-
-.s1-puppet-smile {
-  z-index: 2;
-  opacity: 0;
-}
-
-.s1-puppet-stage.is-active .s1-puppet-smile {
-  animation: s1PuppetSmileBlink 3.8s ease-in-out both;
-}
-
-.s1-puppet-arm {
-  z-index: 3;
-  transform-origin: 25.1% 75.8%;
-}
-
-.s1-puppet-stage.is-active .s1-puppet-arm {
-  animation: s1PuppetArmWave 3.8s ease-in-out both;
-}
-
-.s1-puppet-greet-bubble {
-  position: absolute;
-  left: 14rpx;
-  top: 64rpx;
-  z-index: 5;
-  padding: 8rpx 18rpx;
-  border-radius: 24rpx 24rpx 24rpx 4rpx;
-  background: linear-gradient(135deg, #C41E3A 0%, #8E1428 100%);
-  border: 2rpx solid #FFE082;
-  box-shadow:
-    0 8rpx 20rpx rgba(196, 30, 58, 0.45),
-    0 0 16rpx rgba(242, 201, 76, 0.55);
-  opacity: 0;
-  transform-origin: left bottom;
-  transform: translateY(14rpx) scale(0.75);
-}
-
-.s1-puppet-stage.is-active .s1-puppet-greet-bubble {
-  animation: s1PuppetGreetBubble 3.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-.s1-puppet-greet-text {
-  font-size: 20rpx;
-  color: #FFFDF5;
-  font-weight: 600;
-  letter-spacing: 1rpx;
-  white-space: nowrap;
+.s1-sprite-player.is-playing .s1-sprite-strip {
+  animation: s1SpriteStripPlay 3.8s steps(12, end) both;
 }
 
 .s1-gold-corners {
@@ -3000,7 +2931,7 @@ page {
 .s1-awakening-active .s1-layer-1,
 .s1-awakening-active .s1-layer-2,
 .s1-awakening-active .s1-layer-3 {
-  animation: s1LayerAwakenPopAndRestore 3.8s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+  animation: s1LayerCrossfadeForSprite 3.8s ease-in-out both !important;
 }
 
 .s1-ink-sweep {
@@ -3507,123 +3438,39 @@ page {
   }
 }
 
-@keyframes s1LayerAwakenPopAndRestore {
+@keyframes s1LayerCrossfadeForSprite {
   0% {
     opacity: 0.96;
     transform: translate(-50%, -50%) scale(1);
   }
-  12% {
-    opacity: 0.04;
-    transform: translate(-50%, -44%) scale(1.26);
+  5%, 92% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
   }
-  78% {
-    opacity: 0.04;
-    transform: translate(-50%, -44%) scale(1.26);
-  }
-  95%, 100% {
+  98%, 100% {
     opacity: 0.96;
     transform: translate(-50%, -50%) scale(1);
   }
 }
 
-@keyframes s1PuppetStageLifecycle {
+@keyframes s1SpritePlayerFade {
   0% {
     opacity: 0;
-    transform: translateY(42rpx) scale(0.56);
   }
-  13% {
-    opacity: 1;
-    transform: translateY(-4rpx) scale(1.03);
+  4%, 94% {
+    opacity: 0.98;
   }
-  20%, 76% {
-    opacity: 1;
-    transform: translateY(0rpx) scale(1);
-  }
-  84% {
-    opacity: 1;
-    transform: translateY(4rpx) scale(0.95);
-  }
-  96%, 100% {
-    opacity: 0;
-    transform: translateY(40rpx) scale(0.56);
-  }
-}
-
-@keyframes s1PuppetGripPose {
-  0%, 13% {
-    opacity: 1;
-  }
-  18%, 75% {
-    opacity: 0;
-  }
-  80%, 100% {
-    opacity: 1;
-  }
-}
-
-@keyframes s1PuppetWaveGroupPose {
-  0%, 12% {
-    opacity: 0;
-  }
-  17%, 76% {
-    opacity: 1;
-  }
-  81%, 100% {
+  100% {
     opacity: 0;
   }
 }
 
-@keyframes s1PuppetArmWave {
-  0%, 14% {
-    transform: rotate(-16deg) scale(0.94);
+@keyframes s1SpriteStripPlay {
+  0% {
+    transform: translateX(0%);
   }
-  24% {
-    transform: rotate(13deg) scale(1.02);
-  }
-  34% {
-    transform: rotate(-12deg) scale(1);
-  }
-  44% {
-    transform: rotate(15deg) scale(1.03);
-  }
-  54% {
-    transform: rotate(-11deg) scale(1);
-  }
-  64% {
-    transform: rotate(13deg) scale(1.02);
-  }
-  73% {
-    transform: rotate(-9deg) scale(0.98);
-  }
-  80%, 100% {
-    transform: rotate(-18deg) scale(0.92);
-  }
-}
-
-@keyframes s1PuppetSmileBlink {
-  0%, 20% {
-    opacity: 0;
-  }
-  26%, 70% {
-    opacity: 1;
-  }
-  76%, 100% {
-    opacity: 0;
-  }
-}
-
-@keyframes s1PuppetGreetBubble {
-  0%, 18% {
-    opacity: 0;
-    transform: translateY(14rpx) scale(0.72);
-  }
-  26%, 70% {
-    opacity: 1;
-    transform: translateY(0rpx) scale(1);
-  }
-  78%, 100% {
-    opacity: 0;
-    transform: translateY(10rpx) scale(0.8);
+  100% {
+    transform: translateX(-100%);
   }
 }
 

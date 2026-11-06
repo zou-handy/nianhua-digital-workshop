@@ -78,6 +78,16 @@
                   mode="aspectFit"
                   style="z-index:{{item.zIndex}}; animation-delay:{{item.delay}}ms;"
                 ></image>
+
+                <!-- AI 九宫格序列帧精灵图播放器（正片叠底融入宣纸：全身 -> 探身扒框 -> 眉开眼笑挥手 -> 缩回复原） -->
+                <view class="s1-sprite-player {{openingEffectPlaying ? 'is-playing' : ''}}" aria-hidden="true">
+                  <image
+                    class="s1-sprite-strip"
+                    src="/assets/opening-sprite/door-god-strip.webp"
+                    mode="scaleToFill"
+                  ></image>
+                </view>
+
                 <view class="s1-ink-sweep"></view>
                 <view class="s1-gold-sheen {{openingEffectPlaying ? 'is-active' : ''}}" aria-hidden="true"></view>
                 <view class="s1-code-awakening {{openingEffectPlaying ? 'is-active' : ''}}" aria-hidden="true">
@@ -93,35 +103,6 @@
                   <view class="s1-code-spark s1-spark-6 is-gold"></view>
                   <view class="s1-code-spark s1-spark-7 is-gold"></view>
                   <view class="s1-code-spark s1-spark-8 is-red"></view>
-                </view>
-              </view>
-
-              <!-- 纯代码驱动 2D 门神木偶关节动画（破框探身 -> 挥手微笑打招呼 -> 缩回复原年画） -->
-              <view class="s1-puppet-stage {{openingEffectPlaying ? 'is-active' : ''}}" aria-hidden="true">
-                <image
-                  class="s1-puppet-layer s1-puppet-grip"
-                  src="/assets/opening-puppet/puppet-grip.webp"
-                  mode="aspectFit"
-                ></image>
-                <view class="s1-puppet-wave-group">
-                  <image
-                    class="s1-puppet-layer s1-puppet-body"
-                    src="/assets/opening-puppet/puppet-body.webp"
-                    mode="aspectFit"
-                  ></image>
-                  <image
-                    class="s1-puppet-layer s1-puppet-smile"
-                    src="/assets/opening-puppet/puppet-smile.webp"
-                    mode="aspectFit"
-                  ></image>
-                  <image
-                    class="s1-puppet-layer s1-puppet-arm"
-                    src="/assets/opening-puppet/puppet-arm.webp"
-                    mode="aspectFit"
-                  ></image>
-                </view>
-                <view class="s1-puppet-greet-bubble">
-                  <text class="s1-puppet-greet-text">👋 欢迎来到年画工坊！</text>
                 </view>
               </view>
 
