@@ -155,6 +155,54 @@
         "type": "file"
       },
       {
+        "value": "utils/persistentResourceCache.js",
+        "type": "file"
+      },
+      {
+        "value": "pages/ai-3d/utils/apiBaseURL.js",
+        "type": "file"
+      },
+      {
+        "value": "pages/ai-create/utils/apiBaseURL.js",
+        "type": "file"
+      },
+      {
+        "value": "pages/ai-create/utils/saveLayerImage.js",
+        "type": "file"
+      },
+      {
+        "value": "pages/ai-create/utils/splitColors.js",
+        "type": "file"
+      },
+      {
+        "value": "pages/create/utils",
+        "type": "folder"
+      },
+      {
+        "value": "pages/exploded-view/utils/apiBaseURL.js",
+        "type": "file"
+      },
+      {
+        "value": "media",
+        "type": "folder"
+      },
+      {
+        "value": "images",
+        "type": "folder"
+      },
+      {
+        "value": "README-部署指南.md",
+        "type": "file"
+      },
+      {
+        "value": "cloudbaserc.json",
+        "type": "file"
+      },
+      {
+        "value": "skills-lock.json",
+        "type": "file"
+      },
+      {
         "value": "images/README.md",
         "type": "file"
       },

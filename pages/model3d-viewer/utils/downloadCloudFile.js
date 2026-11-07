@@ -1,5 +1,5 @@
 const { resolveCloudURL } = require('./resolveCloudURL');
-const { getPersistentResource, validateGLB } = require('../../../utils/persistentResourceCache');
+const { getPersistentResource, validateGLB } = require('./persistentResourceCache');
 
 function downloadCloudFile(fileID) {
   if (!fileID || !fileID.startsWith('cloud://')) {
