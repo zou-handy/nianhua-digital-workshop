@@ -2841,6 +2841,23 @@ page {
   opacity: 0 !important;
 }
 
+.s1-paper.s1-paper-settled {
+  animation: none !important;
+  transform: translateY(0) rotate(0deg) scale(1) !important;
+}
+
+.s1-paper.s1-paper-settled .s1-print-layer {
+  animation: none !important;
+  opacity: 0.96 !important;
+  transform: translate(-50%, -50%) scale(1) !important;
+}
+
+.s1-paper.s1-paper-settled .s1-print-seal {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: scale(1) rotate(-3deg) !important;
+}
+
 /* ── 裁切对齐宣纸、擦除左侧小年浮球、保留底部扒框手指与透视内缩画框的 30fps 门神破壁视频 ── */
 .s1-opening-video {
   position: absolute;

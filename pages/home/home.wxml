@@ -63,13 +63,13 @@
           class="s1-print-stage {{openingEffectVisible ? 's1-stage-video-active' : ''}}"
           bindtap="replayOpeningPrint"
         >
-          <view wx:if="{{openingPrintVisible}}" class="s1-print-inner s1-print-running {{openingEffectPlaying ? 's1-awakening-active' : ''}}">
-            <view class="s1-aura-halo {{openingEffectPlaying ? 'is-active' : ''}}" aria-hidden="true"></view>
+          <view wx:if="{{openingPrintVisible}}" class="s1-print-inner s1-print-running {{openingEffectVisible && openingEffectPlaying ? 's1-awakening-active' : ''}}">
+            <view class="s1-aura-halo {{openingEffectVisible && openingEffectPlaying ? 'is-active' : ''}}" aria-hidden="true"></view>
             <view class="s1-board-back"></view>
-            <view class="s1-paper {{openingEffectVisible ? 's1-paper-video-active' : ''}} {{openingEffectPlaying ? 's1-paper-awakened' : ''}}">
+            <view class="s1-paper {{openingEffectVisible ? 's1-paper-video-active' : ''}} {{openingEffectVisible && openingEffectPlaying ? 's1-paper-awakened' : ''}} {{openingSettled ? 's1-paper-settled' : ''}}">
               <view class="s1-paper-surface">
                 <view class="s1-paper-fiber"></view>
-                <view class="s1-gold-corners {{openingEffectPlaying ? 'is-active' : ''}}" aria-hidden="true">
+                <view class="s1-gold-corners {{openingEffectVisible && openingEffectPlaying ? 'is-active' : ''}}" aria-hidden="true">
                   <view class="s1-corner s1-corner-tl"></view>
                   <view class="s1-corner s1-corner-tr"></view>
                   <view class="s1-corner s1-corner-bl"></view>
@@ -88,7 +88,7 @@
                 <video
                   wx:if="{{currentPage === 0 && openingEffectVisible}}"
                   id="s1OpeningVideo"
-                  class="s1-opening-video {{openingEffectPlaying ? 'is-playing' : ''}}"
+                  class="s1-opening-video {{openingEffectVisible && openingEffectPlaying ? 'is-playing' : ''}}"
                   src="{{openingEffectUrl}}"
                   autoplay="{{true}}"
                   loop="{{false}}"
@@ -107,14 +107,14 @@
                 ></video>
 
                 <view class="s1-ink-sweep"></view>
-                <view class="s1-gold-sheen {{openingEffectPlaying ? 'is-active' : ''}}" aria-hidden="true"></view>
+                <view class="s1-gold-sheen {{openingEffectVisible && openingEffectPlaying ? 'is-active' : ''}}" aria-hidden="true"></view>
               </view>
 
-              <view class="s1-stage-badge {{openingStageBadge ? 'is-visible' : ''}} {{openingEffectPlaying ? 'is-gold' : ''}}">
+              <view class="s1-stage-badge {{openingStageBadge ? 'is-visible' : ''}} {{openingEffectVisible && openingEffectPlaying ? 'is-gold' : ''}}">
                 <view class="s1-stage-badge-dot"></view>
                 <text class="s1-stage-badge-text">{{openingStageBadge}}</text>
               </view>
-              <view wx:if="{{!openingEffectPlaying}}" class="s1-print-seal">
+              <view wx:if="{{!(openingEffectVisible && openingEffectPlaying)}}" class="s1-print-seal">
                 <text class="s1-print-seal-text">印</text>
               </view>
             </view>

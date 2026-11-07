@@ -610,6 +610,7 @@ Page({
     openingEffectUrl: VIDEOS.openingWelcome,
     openingEffectVisible: false,
     openingEffectPlaying: false,
+    openingSettled: false,
     openingStageBadge: '壹 · 松烟墨线落版',
     openingActiveStep: 0,
     currentPage: 0,
@@ -819,6 +820,7 @@ Page({
     this._loadAdvancedUserWorks();
     this.bgMusic = wx.createInnerAudioContext();
     this.preloadToolImages();
+    this._preloadOpeningLayers();
     resolveCloudURL(VIDEOS.openingWelcome).then((url) => {
       if (url) this.setData({ openingEffectUrl: url });
     }).catch(() => {});
@@ -1079,9 +1081,21 @@ Page({
     this.setData({ currentPage: 1 });
   },
 
+  _preloadOpeningLayers() {
+    Promise.all(OPENING_PRINT_LAYERS.map((item) => {
+      const source = item.src && item.src.indexOf('cloud://') === 0
+        ? resolveCloudURL(item.src).catch(() => item.src)
+        : Promise.resolve(item.src);
+      return source.then((url) => Object.assign({}, item, { src: url || item.src }));
+    })).then((layers) => {
+      this.setData({ openingLayers: layers });
+    }).catch(() => {});
+  },
+
   _scheduleOpeningEffect() {
     this._clearOpeningSequenceTimers();
     this._stopOpeningAwakeningCanvas();
+    this._openingVideoClosing = false;
 
     const stepBadges = [
       { delay: 200, step: 0, badge: '壹 · 松烟墨线落版' },
@@ -1093,6 +1107,7 @@ Page({
     this.setData({
       openingEffectVisible: false,
       openingEffectPlaying: false,
+      openingSettled: false,
       openingActiveStep: 0,
       openingStageBadge: '壹 · 松烟墨线落版'
     }, () => {
@@ -1113,10 +1128,12 @@ Page({
   _playOpeningEffect() {
     this._openingEffectTimer = null;
     if (this.data.currentPage !== 0) return;
+    this._openingVideoClosing = false;
 
     this.setData({
       openingEffectVisible: true,
       openingEffectPlaying: false,
+      openingSettled: false,
       openingActiveStep: 3,
       openingStageBadge: '伍 · 破框迎客 · 门神问好'
     }, () => {
@@ -1136,8 +1153,8 @@ Page({
   },
 
   onOpeningVideoPlay() {
-    if (this.data.currentPage !== 0) {
-      this._hideOpeningEffect(false);
+    if (this.data.currentPage !== 0 || !this.data.openingEffectVisible || this._openingVideoClosing) {
+      if (this.data.currentPage !== 0) this._hideOpeningEffect(false);
       return;
     }
     if (this._openingVideoStartTimer) {
@@ -1150,8 +1167,8 @@ Page({
   },
 
   onOpeningVideoTimeUpdate(e) {
-    if (this.data.currentPage !== 0) {
-      this._hideOpeningEffect(false);
+    if (this.data.currentPage !== 0 || !this.data.openingEffectVisible || this._openingVideoClosing) {
+      if (this.data.currentPage !== 0) this._hideOpeningEffect(false);
       return;
     }
     const ct = e && e.detail ? e.detail.currentTime : 0;
@@ -1178,6 +1195,7 @@ Page({
   },
 
   _hideOpeningEffect(keepBadge) {
+    this._openingVideoClosing = true;
     this._clearOpeningSequenceTimers();
     this._stopOpeningAwakeningCanvas();
     try {
@@ -1189,6 +1207,8 @@ Page({
     this.setData({
       openingEffectVisible: false,
       openingEffectPlaying: false,
+      openingSettled: true,
+      openingActiveStep: 3,
       openingStageBadge: keepBadge ? '四版套印 · 礼成归位' : ''
     });
   },
@@ -1211,6 +1231,7 @@ Page({
   },
 
   replayOpeningPrint() {
+    this._openingVideoClosing = true;
     this._clearOpeningSequenceTimers();
     this._stopOpeningAwakeningCanvas();
     if (this._openingReplayTimer) {
@@ -1221,7 +1242,8 @@ Page({
     this.setData({
       openingPrintVisible: false,
       openingEffectVisible: false,
-      openingEffectPlaying: false
+      openingEffectPlaying: false,
+      openingSettled: false
     });
     this._openingReplayTimer = setTimeout(() => {
       this.setData({ openingPrintVisible: true });
