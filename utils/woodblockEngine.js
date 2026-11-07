@@ -814,13 +814,13 @@ function separateRgbaToWoodblockPlates(rgba, width, height, options = {}) {
     const L = LStar[i];
     const chroma = Math.hypot(aStar[i], bStar[i]);
 
-    // 1. 提取松烟墨线骨版 (Class 0)：保留精细铠甲鱼鳞纹与五官墨线，同时收敛暗部木雕阴影占比
+    // 1. 提取松烟墨线骨版 (Class 0)：仅提取真正的玄墨线条、黑发、瞳孔与无彩暗部勾线，绝不吸入彩色衣纹/金边/五官暖色阴影
     if (
       l < 48 ||
-      (l < 76 && chroma < 14) ||
-      (g >= 34 && ld >= 6 && l < 185) ||
-      (g >= 22 && ld >= 4 && l < 210) ||
-      (ld >= 12 && l < 165)
+      (l < 78 && chroma < 14) ||
+      (g >= 32 && ld >= 6 && l < 108 && chroma < 18) ||
+      (g >= 22 && ld >= 4 && l < 96 && chroma < 16) ||
+      (ld >= 12 && l < 94 && chroma < 16)
     ) {
       labels[i] = 0;
       continue;
@@ -954,7 +954,13 @@ function separateRgbaToWoodblockPlates(rgba, width, height, options = {}) {
       }
     } else {
       const rgb = activePlates[c].rgb;
-      if (preserveGrad) {
+      if (c === 0) {
+        const rawL = rgbToLuma(rgba[outIdx], rgba[outIdx + 1], rgba[outIdx + 2]);
+        const inkShade = preserveGrad ? clamp(Math.round(rawL * 0.72), 0, 96) : 0;
+        quantizedRgba[outIdx] = clamp(rgb[0] + inkShade, 14, 118);
+        quantizedRgba[outIdx + 1] = clamp(rgb[1] + Math.round(inkShade * 0.96), 12, 112);
+        quantizedRgba[outIdx + 2] = clamp(rgb[2] + Math.round(inkShade * 0.92), 10, 106);
+      } else if (preserveGrad) {
         quantizedRgba[outIdx] = Math.round(rgba[outIdx] * 0.90 + rgb[0] * 0.10);
         quantizedRgba[outIdx + 1] = Math.round(rgba[outIdx + 1] * 0.90 + rgb[1] * 0.10);
         quantizedRgba[outIdx + 2] = Math.round(rgba[outIdx + 2] * 0.90 + rgb[2] * 0.10);
@@ -1224,7 +1230,13 @@ function generateCarvedWoodblockPngBuffer(cleanedLabels, plateIndex, plateRgb, s
     for (let i = 0; i < total; i++) {
       if (printLabels[i] !== c) continue;
       const outIdx = i * 4;
-      if (preserveGrad) {
+      if (c === 0) {
+        const rawL = rgbToLuma(rgba[outIdx], rgba[outIdx + 1], rgba[outIdx + 2]);
+        const inkShade = preserveGrad ? clamp(Math.round(rawL * 0.72), 0, 96) : 0;
+        layerRgba[outIdx] = clamp(meta.rgb[0] + inkShade, 14, 118);
+        layerRgba[outIdx + 1] = clamp(meta.rgb[1] + Math.round(inkShade * 0.96), 12, 112);
+        layerRgba[outIdx + 2] = clamp(meta.rgb[2] + Math.round(inkShade * 0.92), 10, 106);
+      } else if (preserveGrad) {
         layerRgba[outIdx] = Math.round(rgba[outIdx] * 0.90 + meta.rgb[0] * 0.10);
         layerRgba[outIdx + 1] = Math.round(rgba[outIdx + 1] * 0.90 + meta.rgb[1] * 0.10);
         layerRgba[outIdx + 2] = Math.round(rgba[outIdx + 2] * 0.90 + meta.rgb[2] * 0.10);

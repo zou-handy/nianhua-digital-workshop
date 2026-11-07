@@ -266,6 +266,12 @@ function processImageBuffer(imageBuffer, options = {}) {
           layerPng.data[offset] = rawPixels[offset];
           layerPng.data[offset + 1] = rawPixels[offset + 1];
           layerPng.data[offset + 2] = rawPixels[offset + 2];
+        } else if (layerIndex === 0) {
+          const rLum = (rawPixels[offset] * 77 + rawPixels[offset + 1] * 150 + rawPixels[offset + 2] * 29) >> 8;
+          const inkShade = preserveGradient ? clampByte(Math.round(rLum * 0.72), 0, 96) : 0;
+          layerPng.data[offset] = clampByte(plate.r + inkShade, 14, 118);
+          layerPng.data[offset + 1] = clampByte(plate.g + Math.round(inkShade * 0.96), 12, 112);
+          layerPng.data[offset + 2] = clampByte(plate.b + Math.round(inkShade * 0.92), 10, 106);
         } else if (preserveGradient) {
           layerPng.data[offset] = Math.round(rawPixels[offset] * 0.90 + plate.r * 0.10);
           layerPng.data[offset + 1] = Math.round(rawPixels[offset + 1] * 0.90 + plate.g * 0.10);
@@ -311,7 +317,13 @@ function processImageBuffer(imageBuffer, options = {}) {
     const layerIndex = printAssignment[i];
     if (layerIndex >= 0 && layerIndex < plateCount) {
       const plate = targetPalette[layerIndex];
-      if (preserveGradient) {
+      if (layerIndex === 0) {
+        const rLum = (rawPixels[offset] * 77 + rawPixels[offset + 1] * 150 + rawPixels[offset + 2] * 29) >> 8;
+        const inkShade = preserveGradient ? clampByte(Math.round(rLum * 0.72), 0, 96) : 0;
+        quantized.data[offset] = clampByte(plate.r + inkShade, 14, 118);
+        quantized.data[offset + 1] = clampByte(plate.g + Math.round(inkShade * 0.96), 12, 112);
+        quantized.data[offset + 2] = clampByte(plate.b + Math.round(inkShade * 0.92), 10, 106);
+      } else if (preserveGradient) {
         quantized.data[offset] = Math.round(rawPixels[offset] * 0.90 + plate.r * 0.10);
         quantized.data[offset + 1] = Math.round(rawPixels[offset + 1] * 0.90 + plate.g * 0.10);
         quantized.data[offset + 2] = Math.round(rawPixels[offset + 2] * 0.90 + plate.b * 0.10);
@@ -537,17 +549,21 @@ function assignPhotoToWoodblockPlates(pixels, width, height, bgMask, targetPalet
     const l = lum[i];
     const g = grad[i];
     const ld = localDiff[i];
-
-    // 墨线版判据：暗部骨骼 OR 边缘轮廓凹陷线（兼容浅色宣纸上的细墨线）
-    if (l <= darkThreshold || (g >= 24 && ld >= 5 && l < 205) || (ld >= 11 && l < 192)) {
-      assignment[i] = 0; // 松烟墨线骨版
-      continue;
-    }
-
     const offset = i * 4;
     const r = pixels[offset], gr = pixels[offset + 1], bl = pixels[offset + 2];
     const [L, a, b] = rgbToLab(r, gr, bl);
     const chroma = Math.hypot(a, b);
+
+    // 墨线版判据：仅提取真正的玄墨线条、黑发、瞳孔与无彩暗部勾线，绝不吸入彩色衣纹/金边/五官暖色阴影
+    if (
+      l < 48 ||
+      (l <= darkThreshold && chroma < 16) ||
+      (g >= 24 && ld >= 5 && l < 108 && chroma < 18) ||
+      (ld >= 11 && l < 96 && chroma < 16)
+    ) {
+      assignment[i] = 0; // 松烟墨线骨版
+      continue;
+    }
 
     // 宣纸留白判据：仅将高明度纯白/米白宣纸底色留白，人物面部/手部暖肉色归入暖杏开相木板
     const isPaperHighlight =
