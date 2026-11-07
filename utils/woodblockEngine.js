@@ -107,17 +107,29 @@ const MINERAL_CANDIDATE_POOL = [
   },
   {
     key: 'pink',
-    hex: '#D86C7A',
-    label: '桃粉开相版',
-    name: '桃粉开相木板',
-    shortName: '粉',
-    textColor: '#ffffff',
-    material: '铅粉/胭脂',
-    purpose: '开相柔色',
-    rgb: [216, 108, 122],
-    desc: '桃粉版用于人物面庞开相、花卉瓣叶与柔和浅暖色面。'
+    hex: '#ECC096',
+    label: '暖杏开相版',
+    name: '暖杏开相木板',
+    shortName: '肤',
+    textColor: '#1A0F08',
+    material: '铅粉/朱膘',
+    purpose: '人物开相',
+    rgb: [236, 192, 150],
+    desc: '暖杏开相版以铅粉调和微许朱膘与藤黄，专门承接人像面庞、手部与自然柔和暖肉色面。'
   }
 ];
+
+function isPortraitSkinTone(r, g, b, L, a, bLab) {
+  return (
+    L >= 48 && L <= 91 &&
+    a >= 4 && a <= 36 &&
+    bLab >= 9 && bLab <= 58 &&
+    r >= 165 && g >= 96 && b >= 48 &&
+    r > g && g > b &&
+    (r - g) >= 16 && (r - g) <= 104 &&
+    (g - b) >= 8 && (g - b) <= 75
+  );
+}
 
 const FOSHAN_PALETTE_V2 = [
   INK_KEY_PLATE,
@@ -478,9 +490,11 @@ function selectDynamicMineralPlates(smoothed, bgMask, initialLabels, LStar, aSta
     const px = i * 4;
     const r = smoothed[px], g = smoothed[px + 1], bRgb = smoothed[px + 2];
 
-    // 强色相直通规则：保护实拍室内光下的朱砂红、鱼鳞金黄、石绿、靛青不被灰褐阴影稀释，同时严防人物暖肤色误入红版
-    if (a >= 20 && a > b * 0.65 && (r - g) >= 62 && g < 148) {
-      bestIdx = (b >= 24 && L >= 54 && g >= 75) ? 4 : 0; // 丹柿橙 vs 万年红
+    // 强色相直通规则：人物自然暖杏肤色直通暖杏开相版(7)，同时保护实拍/AI画作中的朱砂红、石黄、石绿、靛青
+    if (isPortraitSkinTone(r, g, bRgb, L, a, b)) {
+      bestIdx = 7; // 人物面部/颈部/手部自然肤色 -> 暖杏开相版
+    } else if (a >= 18 && a > b * 0.55 && (r - g) >= 58 && g < 110 && (g - bRgb) < 38) {
+      bestIdx = 0; // 正统朱砂红/万年红
     } else if (b >= 11 && L >= 56 && a > -10 && a < 20) {
       bestIdx = 1; // 室内光下的金色/米黄鱼鳞甲与暖亮面 -> 石黄版
     } else if (a <= -5 && b >= -12) {
@@ -493,12 +507,12 @@ function selectDynamicMineralPlates(smoothed, bgMask, initialLabels, LStar, aSta
       for (let c = 0; c < MINERAL_CANDIDATE_POOL.length; c++) {
         const [pL, pa, pb] = candidateLabs[c];
         let dist = Math.hypot((L - pL) * 0.65, a - pa, b - pb);
-        if (c === 0 && a > meanA + 8 && (r - g) >= 62 && g < 145) dist -= 12; // 万年红
-        if ((c === 0 || c === 4) && g >= 132 && bRgb >= 92 && (r - g) <= 74) dist += 42; // 抑制暖肤色落入红/橙版
+        if (c === 0 && a > meanA + 8 && (r - g) >= 56 && g < 142) dist -= 14; // 万年红
+        if ((c === 0 || c === 4) && g >= 132 && bRgb >= 92 && (r - g) <= 78) dist += 42; // 抑制暖肤色落入红/橙版
         if (c === 1 && b > meanB + 4 && L >= meanL - 6) dist -= 14; // 石黄
         if (c === 2 && a < meanA - 3 && b >= -10) dist -= 12; // 石绿
         if (c === 3 && b < -4) dist -= 12; // 靛青蓝
-        if ((c === 6 || c === 7) && chroma < 30) dist += 28; // 惩罚低饱和像素落入瑞紫/桃粉
+        if (c === 6 && chroma < 30) dist += 28; // 惩罚低饱和像素落入瑞紫
         if (dist < bestDist) {
           bestDist = dist;
           bestIdx = c;
@@ -535,24 +549,39 @@ function selectDynamicMineralPlates(smoothed, bgMask, initialLabels, LStar, aSta
     selectedChromatic = ranked.slice(0, targetChromaticCount);
   }
 
-  // 按照传统套印工序排序（红 -> 橙 -> 黄 -> 粉 -> 绿 -> 蓝 -> 紫 -> 赭）
+  // 若画面存在显著人物面部/手部暖肤色（占比 >= 2%），强制保底激活「暖杏开相木板 (idx=7)」，确保分色后人物肤色正常自然
+  const skinCandidate = ranked.find((item) => item.idx === 7);
+  if (skinCandidate && skinCandidate.ratio >= 0.02 && skinCandidate.count >= 24) {
+    const alreadyHasSkin = selectedChromatic.some((item) => item.idx === 7);
+    if (!alreadyHasSkin) {
+      if (isAuto && selectedChromatic.length < 5) {
+        selectedChromatic.push(skinCandidate);
+      } else if (selectedChromatic.length > 0) {
+        selectedChromatic[selectedChromatic.length - 1] = skinCandidate;
+      }
+    }
+  }
+
+  // 按照传统套印工序排序（红 -> 橙 -> 黄 -> 肤 -> 绿 -> 蓝 -> 紫 -> 赭）
   const orderPriority = { red: 1, orange: 2, yellow: 3, pink: 4, green: 5, blue: 6, purple: 7, brown: 8 };
   selectedChromatic.sort((a, b) => (orderPriority[a.meta.key] || 9) - (orderPriority[b.meta.key] || 9));
 
-  // 将原图聚类均值与传统矿物标准色按 30% : 70% 融合，既有原图真实色相，又保持年画矿物质感
+  // 将原图聚类均值与传统矿物标准色融合（暖杏开相版按 65% 原图真实肤色 + 35% 铅粉暖杏融合，精准还原正常皮肤色）
   const activePlates = [Object.assign({ order: 1 }, INK_KEY_PLATE)];
   selectedChromatic.forEach((item, idx) => {
     const cIdx = item.idx;
     const baseRgb = item.meta.rgb;
     let finalRgb = baseRgb.slice();
-    if (hitCounts[cIdx] > 30) {
+    if (hitCounts[cIdx] > 20) {
       const avgR = sumR[cIdx] / hitCounts[cIdx];
       const avgG = sumG[cIdx] / hitCounts[cIdx];
       const avgB = sumB[cIdx] / hitCounts[cIdx];
+      const origWeight = item.meta.key === 'pink' ? 0.65 : 0.28;
+      const baseWeight = 1 - origWeight;
       finalRgb = [
-        Math.round(baseRgb[0] * 0.72 + avgR * 0.28),
-        Math.round(baseRgb[1] * 0.72 + avgG * 0.28),
-        Math.round(baseRgb[2] * 0.72 + avgB * 0.28)
+        Math.round(baseRgb[0] * baseWeight + avgR * origWeight),
+        Math.round(baseRgb[1] * baseWeight + avgG * origWeight),
+        Math.round(baseRgb[2] * baseWeight + avgB * origWeight)
       ];
     }
     activePlates.push(Object.assign({}, item.meta, {
@@ -577,7 +606,7 @@ function ensureNoEmptyDynamicPlates(labels, activePlates, luma, LStar, aStar, bS
     }
   }
   if (activeTotal < 64) return labels;
-  const minRequired = Math.max(36, Math.round(activeTotal * 0.015));
+  const minRequired = 24;
 
   if (counts[0] < minRequired) {
     const candidates = [];
@@ -599,7 +628,9 @@ function ensureNoEmptyDynamicPlates(labels, activePlates, luma, LStar, aStar, bS
     const targetLab = rgbToLab(activePlates[c].rgb[0], activePlates[c].rgb[1], activePlates[c].rgb[2]);
     const candidates = [];
     for (let i = 0; i < total; i++) {
-      if (!bgMask[i] && labels[i] > 0 && labels[i] !== c && counts[labels[i]] > minRequired * 2) {
+      const donorIdx = labels[i];
+      if (!bgMask[i] && donorIdx > 0 && donorIdx !== c && counts[donorIdx] > minRequired * 2) {
+        if (activePlates[donorIdx] && activePlates[donorIdx].key === 'pink') continue;
         const dLab = Math.hypot((LStar[i] - targetLab[0]) * 0.6, aStar[i] - targetLab[1], bStar[i] - targetLab[2]);
         if (dLab <= 30) {
           candidates.push({ idx: i, dist: dLab });
@@ -795,23 +826,15 @@ function separateRgbaToWoodblockPlates(rgba, width, height, options = {}) {
       continue;
     }
 
-    // 2. 宣纸底色与人物开相留白保护（将极亮高光、暖宣纸底色、以及人像面部/手部暖肉色统一归入宣纸自然开相留白）
+    // 2. 宣纸底色高光留白保护（仅将高明度纯白/米白宣纸底色留白，人物肤色进入暖杏开相版）
     const px = i * 4;
     const r = smoothed[px], gr = smoothed[px + 1], bRgb = smoothed[px + 2];
     const a = aStar[i], bLab = bStar[i];
     const isPaperHighlight =
-      (L >= 88 && chroma < 10 && bLab < 9) ||
-      (l >= 234 && chroma < 12 && bLab < 10) ||
-      (L >= 87.5 && Math.abs(a) <= 7.5 && bLab >= -4 && bLab <= 29 && r >= 232 && gr >= 214 && bRgb >= 170);
-    const isPortraitSkinReserve =
-      L >= 65 && L <= 91 &&
-      a >= 6 && a <= 25.5 &&
-      bLab >= 10 && bLab <= 38 &&
-      r >= 198 && gr >= 142 && bRgb >= 104 &&
-      r > gr && gr >= bRgb &&
-      (r - gr) >= 22 && (r - gr) <= 78 &&
-      (gr - bRgb) >= 8 && (gr - bRgb) <= 60;
-    if (isPaperHighlight || isPortraitSkinReserve) {
+      (L >= 88.5 && chroma < 12 && bLab < 11) ||
+      (l >= 234 && chroma < 14 && bLab < 12) ||
+      (L >= 89 && Math.abs(a) <= 6 && bLab >= -4 && bLab <= 24 && r >= 236 && gr >= 222 && bRgb >= 186);
+    if (isPaperHighlight) {
       labels[i] = -1;
       continue;
     }
@@ -830,19 +853,26 @@ function separateRgbaToWoodblockPlates(rgba, width, height, options = {}) {
     const r = smoothed[px], gr = smoothed[px + 1], bRgb = smoothed[px + 2];
     const L = LStar[i], a = aStar[i], b = bStar[i];
     const chroma = Math.hypot(a, b);
+    const isSkin = isPortraitSkinTone(r, gr, bRgb, L, a, b);
     let bestClass = 1;
     let bestScore = Infinity;
     for (let c = 1; c < numPlates; c++) {
       const key = activePlates[c].key;
       const [pL, pa, pb] = plateLabs[c];
       let dist = Math.hypot((L - pL) * 0.58, a - pa, b - pb);
-      if (key === 'red' && a >= 20 && a > b * 0.65 && (r - gr) >= 62 && gr < 148) dist -= 18;
-      if ((key === 'red' || key === 'orange') && gr >= 132 && bRgb >= 92 && (r - gr) <= 74) dist += 44;
-      if (key === 'yellow' && b >= 10 && L >= 56 && a > -10 && a < 20) dist -= 22;
-      if (key === 'green' && a <= -4 && b >= -12) dist -= 18;
-      if (key === 'blue' && b <= -4) dist -= 18;
-      if (key === 'brown' && chroma < 26 && L < 66) dist -= 14;
-      if ((key === 'purple' || key === 'pink') && chroma < 28) dist += 25;
+      if (isSkin) {
+        if (key === 'pink') dist -= 38;
+        if (key === 'red' || key === 'orange' || key === 'brown') dist += 48;
+      } else {
+        if (key === 'red' && a >= 20 && a > b * 0.55 && (r - gr) >= 58 && gr < 110 && (gr - bRgb) < 38) dist -= 22;
+        if ((key === 'red' || key === 'orange') && gr >= 96 && (gr - bRgb) >= 28) dist += 44;
+        if (key === 'yellow' && b >= 10 && L >= 56 && a > -10 && a < 20) dist -= 22;
+        if (key === 'green' && a <= -4 && b >= -12) dist -= 18;
+        if (key === 'blue' && b <= -4) dist -= 18;
+        if (key === 'brown' && chroma < 26 && L < 66) dist -= 14;
+        if (key === 'purple' && chroma < 28) dist += 25;
+        if (key === 'pink') dist += 18;
+      }
       if (dist < bestScore) {
         bestScore = dist;
         bestClass = c;

@@ -13,7 +13,8 @@ const {
   readLocalFileAsDataUrl,
   requestNianhuaImageGeneration,
   buildAdvancedWorkFromRecord,
-  saveWorkToDualStores
+  saveWorkToDualStores,
+  saveNianhuaImageToAlbum
 } = require('../../utils/nianhuaPipeline');
 
 function normalizeFeedToken(feedToken) {
@@ -700,6 +701,7 @@ Page({
     advancedCreatorPlateCount: 'auto',
     advancedCreatorGenerating: false,
     advancedCreatorSplitting: false,
+    advancedCreatorSaving: false,
     advancedCreatorStage: '',
     advancedCreatorStepIndex: 0,
     advancedCreatorWorkingText: '',
@@ -2033,6 +2035,33 @@ Page({
     var ok = await this.redrawPhotoAsAnimeNianhua();
     if (ok && this.data.advancedCreatorImage) {
       await this.splitAdvancedCreatorImage();
+    }
+  },
+
+  previewAdvancedCreatorImage() {
+    if (!this.data.advancedCreatorImage) return;
+    wx.previewImage({
+      urls: [this.data.advancedCreatorImage],
+      current: this.data.advancedCreatorImage
+    });
+  },
+
+  async saveAdvancedCreatorImageToAlbum() {
+    if (!this.data.advancedCreatorImage || this.data.advancedCreatorSaving) return;
+    this.setData({ advancedCreatorSaving: true });
+    wx.showLoading({ title: '正在保存至相册...', mask: true });
+    try {
+      await saveNianhuaImageToAlbum(this.data.advancedCreatorImage, this.data.advancedCreatorFileID);
+      wx.hideLoading();
+      wx.showToast({ title: '已保存到手机相册', icon: 'success' });
+    } catch (err) {
+      wx.hideLoading();
+      var msg = (err && err.message) || '保存失败，可点击图片长按保存';
+      if (msg !== '未开启相册权限') {
+        wx.showToast({ title: msg, icon: 'none' });
+      }
+    } finally {
+      this.setData({ advancedCreatorSaving: false });
     }
   },
 

@@ -16,8 +16,20 @@ const FOSHAN_FOUR_PALETTE = [
   { key: 'orange', r: 217, g: 107, b: 39, hex: '#D96B27', label: '丹柿橙版', name: '雄黄丹柿木板', shortName: '橙', material: '雄黄/红丹', purpose: '暖调过渡' },
   { key: 'brown', r: 140, g: 74, b: 39, hex: '#8C4A27', label: '赭石棕版', name: '赭石古拙木板', shortName: '赭', material: '赭石/代赭', purpose: '厚重肌理' },
   { key: 'purple', r: 122, g: 59, b: 105, hex: '#7A3B69', label: '瑞紫霞版', name: '胭脂瑞紫木板', shortName: '紫', material: '胭脂/花青', purpose: '华贵点缀' },
-  { key: 'pink', r: 216, g: 108, b: 122, hex: '#D86C7A', label: '桃粉开相版', name: '桃粉开相木板', shortName: '粉', material: '铅粉/胭脂', purpose: '开相柔色' }
+  { key: 'pink', r: 236, g: 192, b: 150, hex: '#ECC096', label: '暖杏开相版', name: '暖杏开相木板', shortName: '肤', material: '铅粉/朱膘', purpose: '人物开相' }
 ];
+
+function isPortraitSkinTone(r, g, b, L, a, bLab) {
+  return (
+    L >= 48 && L <= 91 &&
+    a >= 4 && a <= 36 &&
+    bLab >= 9 && bLab <= 58 &&
+    r >= 165 && g >= 96 && b >= 48 &&
+    r > g && g > b &&
+    (r - g) >= 16 && (r - g) <= 104 &&
+    (g - b) >= 8 && (g - b) <= 75
+  );
+}
 
 exports.main = async (event = {}) => {
   const app = event._mockApp || tcb.init({ env: tcb.SYMBOL_CURRENT_ENV });
@@ -486,32 +498,31 @@ function assignPhotoToWoodblockPlates(pixels, width, height, bgMask, targetPalet
     const [L, a, b] = rgbToLab(r, gr, bl);
     const chroma = Math.hypot(a, b);
 
-    // 宣纸留白与人物面部开相留白判据：高明度纸白/米白底色，以及人像面部/手部暖肉色统一留白开相，严禁染成红皮肤
+    // 宣纸留白判据：仅将高明度纯白/米白宣纸底色留白，人物面部/手部暖肉色归入暖杏开相木板
     const isPaperHighlight =
-      (L >= 86 && chroma < 19) ||
-      (l >= 224 && chroma < 24) ||
-      (L >= 87.5 && Math.abs(a) <= 7.5 && b >= -4 && b <= 29 && r >= 232 && gr >= 214 && bl >= 170);
-    const isPortraitSkinReserve =
-      L >= 65 && L <= 91 &&
-      a >= 6 && a <= 25.5 &&
-      b >= 10 && b <= 38 &&
-      r >= 198 && gr >= 142 && bl >= 104 &&
-      r > gr && gr >= bl &&
-      (r - gr) >= 22 && (r - gr) <= 78 &&
-      (gr - bl) >= 8 && (gr - bl) <= 60;
-    if (isPaperHighlight || isPortraitSkinReserve) {
+      (L >= 88.5 && chroma < 14) ||
+      (l >= 232 && chroma < 18) ||
+      (L >= 89 && Math.abs(a) <= 6 && b >= -4 && b <= 24 && r >= 236 && gr >= 222 && bl >= 186);
+    if (isPaperHighlight) {
       assignment[i] = -1;
       continue;
     }
 
+    const isSkin = isPortraitSkinTone(r, gr, bl, L, a, b);
     let bestPlate = 1;
     let bestDist = Infinity;
     for (let p = 1; p < plateCount; p++) {
       const [pL, pa, pb] = plateLabs[p];
       let dist = Math.hypot((L - pL) * 0.65, a - pa, b - pb);
       const pKey = targetPalette[p] && targetPalette[p].key;
-      if ((pKey === 'red' || pKey === 'orange') && gr >= 132 && bl >= 92 && (r - gr) <= 74) {
-        dist += 44;
+      if (isSkin) {
+        if (pKey === 'pink') dist -= 38;
+        if (pKey === 'red' || pKey === 'orange' || pKey === 'brown') dist += 44;
+      } else {
+        if ((pKey === 'red' || pKey === 'orange') && gr >= 132 && bl >= 92 && (r - gr) <= 78) {
+          dist += 44;
+        }
+        if (pKey === 'pink') dist += 18;
       }
       if (dist < bestDist) {
         bestDist = dist;
@@ -540,16 +551,20 @@ function assignFlatToWoodblockPlates(pixels, width, height, bgMask, targetPalett
 
     const lab = rgbToLab(r, g, b);
     const L = lab[0], aLab = lab[1], bLab = lab[2];
-    const isPaperOrSkin =
-      (L >= 87.5 && Math.abs(aLab) <= 7.5 && bLab >= -4 && bLab <= 29 && r >= 232 && g >= 214 && b >= 170) ||
-      (L >= 65 && L <= 91 && aLab >= 6 && aLab <= 25.5 && bLab >= 10 && bLab <= 38 &&
-       r >= 198 && g >= 142 && b >= 104 && r > g && g >= b && (r - g) >= 22 && (r - g) <= 78 && (g - b) >= 8 && (g - b) <= 60);
-    if (isPaperOrSkin && targetPalette.length >= 3) continue;
+    const isPaper =
+      (L >= 89 && Math.abs(aLab) <= 6 && bLab >= -4 && bLab <= 24 && r >= 236 && g >= 222 && b >= 186);
+    if (isPaper && targetPalette.length >= 3) continue;
+    const isSkin = isPortraitSkinTone(r, g, b, L, aLab, bLab);
     let minDist = Infinity;
     let bestLayer = -1;
 
     for (let j = 0; j < paletteLabs.length; j++) {
-      const dist = deltaE76(lab, paletteLabs[j]);
+      let dist = deltaE76(lab, paletteLabs[j]);
+      const pKey = targetPalette[j] && targetPalette[j].key;
+      if (isSkin && targetPalette.length >= 3) {
+        if (pKey === 'pink') dist -= 38;
+        if (pKey === 'red' || pKey === 'orange' || pKey === 'brown') dist += 44;
+      }
       if (dist < minDist) {
         minDist = dist;
         bestLayer = j;
@@ -732,7 +747,7 @@ function ensureNoEmptyPlates(assignment, pixels, width, height, bgMask, plateCou
   }
 
   if (totalAssigned < 100) return;
-  const minRequired = Math.max(25, Math.floor(totalAssigned * 0.015));
+  const minRequired = 24;
 
   for (let targetPlate = 0; targetPlate < plateCount; targetPlate++) {
     if (counts[targetPlate] >= minRequired) continue;
@@ -815,12 +830,16 @@ function buildTargetPalette(requestedPalette, paletteLabels, maxColors, workingP
       if (Math.hypot(a, bStar) < 16) continue;
 
       let bestIdx = 0, bestDist = Infinity;
-      for (let c = 0; c < candidates.length; c++) {
-        const [pL, pa, pb] = candidateLabs[c];
-        const dist = Math.hypot((L - pL) * 0.68, a - pa, bStar - pb);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestIdx = c;
+      if (isPortraitSkinTone(r, g, b, L, a, bStar)) {
+        bestIdx = 7;
+      } else {
+        for (let c = 0; c < candidates.length; c++) {
+          const [pL, pa, pb] = candidateLabs[c];
+          const dist = Math.hypot((L - pL) * 0.68, a - pa, bStar - pb);
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestIdx = c;
+          }
         }
       }
       hitCounts[bestIdx]++;
@@ -848,6 +867,18 @@ function buildTargetPalette(requestedPalette, paletteLabels, maxColors, workingP
     selected = ranked.slice(0, targetChromatic);
   }
 
+  const skinCandidate = ranked.find((item) => item.idx === 7);
+  if (skinCandidate && skinCandidate.ratio >= 0.02 && skinCandidate.count >= 8) {
+    const alreadyHasSkin = selected.some((item) => item.idx === 7);
+    if (!alreadyHasSkin) {
+      if (isAuto && selected.length < 5) {
+        selected.push(skinCandidate);
+      } else if (selected.length > 0) {
+        selected[selected.length - 1] = skinCandidate;
+      }
+    }
+  }
+
   const orderPriority = { red: 1, orange: 2, yellow: 3, pink: 4, green: 5, blue: 6, purple: 7, brown: 8 };
   selected.sort((a, b) => (orderPriority[a.meta.key] || 9) - (orderPriority[b.meta.key] || 9));
 
@@ -855,10 +886,12 @@ function buildTargetPalette(requestedPalette, paletteLabels, maxColors, workingP
   selected.forEach((item) => {
     const cIdx = item.idx;
     let r = item.meta.r, g = item.meta.g, b = item.meta.b;
-    if (hitCounts[cIdx] > 10) {
-      r = Math.round(r * 0.72 + (sumR[cIdx] / hitCounts[cIdx]) * 0.28);
-      g = Math.round(g * 0.72 + (sumG[cIdx] / hitCounts[cIdx]) * 0.28);
-      b = Math.round(b * 0.72 + (sumB[cIdx] / hitCounts[cIdx]) * 0.28);
+    if (hitCounts[cIdx] > 8) {
+      const origW = item.meta.key === 'pink' ? 0.65 : 0.28;
+      const baseW = 1 - origW;
+      r = Math.round(r * baseW + (sumR[cIdx] / hitCounts[cIdx]) * origW);
+      g = Math.round(g * baseW + (sumG[cIdx] / hitCounts[cIdx]) * origW);
+      b = Math.round(b * baseW + (sumB[cIdx] / hitCounts[cIdx]) * origW);
     }
     finalPalette.push(Object.assign({}, item.meta, {
       r, g, b,

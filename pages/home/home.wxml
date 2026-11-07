@@ -847,10 +847,13 @@
       </view>
       <view wx:if="{{advancedCreatorImage}}" class="advanced-creator-result">
         <view class="advanced-creator-source-badge">
-          <text>{{advancedCreatorSourceType === 'photo' ? '自拍/实拍原图 · 支持 AI 二次元国潮年画化或 1:1 刀刻木版直转' : 'AI 二次元年画底稿 · 支持自适应多色木版拆解'}}</text>
+          <text>{{advancedCreatorSourceType === 'photo' ? '自拍/实拍原图 · 支持 AI 二次元国潮年画化或 1:1 刀刻木版直转' : 'AI 二次元年画底稿 · 支持保存至相册与自适应多色木版拆解'}}</text>
         </view>
-        <image class="advanced-creator-image" src="{{advancedCreatorImage}}" mode="aspectFit"></image>
+        <image class="advanced-creator-image" src="{{advancedCreatorImage}}" mode="aspectFit" bindtap="previewAdvancedCreatorImage"></image>
         <view class="advanced-creator-split-group">
+          <button class="advanced-creator-btn advanced-creator-btn-save" bindtap="saveAdvancedCreatorImageToAlbum" disabled="{{advancedCreatorGenerating || advancedCreatorSplitting || advancedCreatorSaving}}">
+            {{advancedCreatorSaving ? '正在保存至手机相册...' : (advancedCreatorSourceType === 'photo' ? '保存当前图片到手机相册' : '保存 AI 年画图片到手机相册')}}
+          </button>
           <button wx:if="{{advancedCreatorSourceType === 'photo'}}" class="advanced-creator-split" bindtap="selfieToAnimeAndSplit" disabled="{{advancedCreatorGenerating || advancedCreatorSplitting}}">
             一键 AI 二次元年画化 + 自动分色装台
           </button>

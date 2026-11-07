@@ -1,5 +1,5 @@
 const { buildNianhuaImagePrompt, buildAnimeNianhuaPrompt } = require('./nianhuaImagePrompt');
-const { separateRgbaToWoodblockPlates } = require('./woodblockEngine');
+const { separateRgbaToWoodblockPlates, encodeRgbaToPngArrayBuffer } = require('./woodblockEngine');
 
 const USER_GALLERY_CACHE_KEY = 'userColorLayers';
 const USER_ADVANCED_WORKS_KEY = 'advancedPrintUserWorks';
@@ -1107,6 +1107,105 @@ function saveWorkToDualStores(splitResult, options = {}) {
   };
 }
 
+/**
+ * 将 AI 生成或风格化后的年画图片保存到手机系统相册（自动绕过非白名单外部 COS 域名限制）
+ */
+async function saveNianhuaImageToAlbum(imageSource, fileID = '') {
+  const source = String(fileID || imageSource || '').trim();
+  if (!source) {
+    throw new Error('暂无可保存的年画图片');
+  }
+
+  let localFilePath = '';
+
+  if (source.startsWith('cloud://')) {
+    localFilePath = await resolveLocalImagePathForCanvas(source);
+  } else if (String(imageSource || '').startsWith('data:image/')) {
+    const raw = String(imageSource);
+    const isPng = /^data:image\/png/i.test(raw);
+    const ext = isPng ? 'png' : 'jpg';
+    const b64 = raw.replace(/^data:image\/\w+;base64,/, '');
+    localFilePath = writeUserFileSafe(
+      `${wx.env.USER_DATA_PATH}/nianhua_album_${Date.now()}.${ext}`,
+      wx.base64ToArrayBuffer(b64)
+    );
+  } else if (isRemoteNonWhitelistedUrl(imageSource)) {
+    // 混元生图 COS 等外部域名不在 downloadFile 白名单时，经云函数原图无损中转合成至本地文件
+    const cloudResult = await requestSplitColorsViaCloudFunction({
+      image: imageSource,
+      imageUrl: imageSource,
+      removeBackground: false,
+      flattenPalette: false,
+      maxColors: 2,
+      palette: ['#282828', '#B8B8B8'],
+      maxDimension: 960
+    });
+    const validSources = (Array.isArray(cloudResult && cloudResult.layers) ? cloudResult.layers : [])
+      .map((item) => item && (item.fileID || item.url || item.data))
+      .filter(Boolean);
+    if (!validSources.length) {
+      throw new Error('云端中转图片失败');
+    }
+    const localPaths = await Promise.all(validSources.map((src) => resolveLocalImagePathForCanvas(src)));
+    const probeCanvas = wx.createOffscreenCanvas({ type: '2d', width: 16, height: 16 });
+    const loadedImages = [];
+    for (let i = 0; i < localPaths.length; i++) {
+      const img = await loadCanvasImageWithFallback(probeCanvas, localPaths[i], validSources[i]);
+      if (img) loadedImages.push(img);
+    }
+    if (!loadedImages.length) {
+      throw new Error('年画图片解码失败');
+    }
+    const rawW = loadedImages[0].width || 512;
+    const rawH = loadedImages[0].height || 512;
+    const maxDim = 640;
+    const scale = Math.min(1, maxDim / Math.max(rawW, rawH));
+    const width = Math.max(128, Math.round(rawW * scale));
+    const height = Math.max(128, Math.round(rawH * scale));
+    const canvas = wx.createOffscreenCanvas({ type: '2d', width, height });
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#FAF2E2';
+    ctx.fillRect(0, 0, width, height);
+    for (let i = 0; i < loadedImages.length; i++) {
+      ctx.drawImage(loadedImages[i], 0, 0, width, height);
+    }
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const pngBuffer = encodeRgbaToPngArrayBuffer(imageData.data, width, height);
+    localFilePath = writeUserFileSafe(`${wx.env.USER_DATA_PATH}/nianhua_album_${Date.now()}.png`, pngBuffer);
+  } else if (/^https?:\/\//i.test(String(imageSource)) && !/^http:\/\/(usr|tmp)\//i.test(String(imageSource))) {
+    localFilePath = await resolveLocalImagePathForCanvas(imageSource);
+  } else {
+    localFilePath = String(imageSource);
+  }
+
+  await new Promise((resolve, reject) => {
+    wx.saveImageToPhotosAlbum({
+      filePath: localFilePath,
+      success: resolve,
+      fail: (err) => {
+        const msg = String((err && err.errMsg) || '');
+        if (/auth deny|authorize:fail|auth denied/i.test(msg)) {
+          wx.showModal({
+            title: '需要相册保存权限',
+            content: '请在设置中开启「保存到相册」权限，以便保存生成的年画作品。',
+            confirmText: '去开启',
+            success: (modalRes) => {
+              if (modalRes && modalRes.confirm && wx.openSetting) {
+                wx.openSetting({});
+              }
+            }
+          });
+          reject(new Error('未开启相册权限'));
+          return;
+        }
+        reject(new Error(msg || '保存到相册失败'));
+      }
+    });
+  });
+
+  return localFilePath;
+}
+
 module.exports = {
   USER_GALLERY_CACHE_KEY,
   USER_ADVANCED_WORKS_KEY,
@@ -1121,5 +1220,6 @@ module.exports = {
   requestNianhuaImageGeneration,
   normalizeSavedLayers,
   buildAdvancedWorkFromRecord,
-  saveWorkToDualStores
+  saveWorkToDualStores,
+  saveNianhuaImageToAlbum
 };
