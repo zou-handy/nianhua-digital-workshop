@@ -1210,74 +1210,135 @@ function generateCarvedWoodblockRgba(cleanedLabels, plateIndex, plateRgb, width,
 
       const raised = cleanedLabels[idx] === plateIndex;
       if (raised) {
-        const tlRecessed = (cleanedLabels[idx - width - 1] !== plateIndex)
-          || (cleanedLabels[idx - width] !== plateIndex)
-          || (cleanedLabels[idx - 1] !== plateIndex);
-        const brRecessed = (cleanedLabels[idx + width + 1] !== plateIndex)
-          || (cleanedLabels[idx + width] !== plateIndex)
-          || (cleanedLabels[idx + 1] !== plateIndex);
+        const tlRecessed = (x > bevel && y > bevel) && (
+          cleanedLabels[idx - width - 1] !== plateIndex ||
+          cleanedLabels[idx - width] !== plateIndex ||
+          cleanedLabels[idx - 1] !== plateIndex
+        );
+        const tlInner = !tlRecessed && (x > bevel + 1 && y > bevel + 1) && (
+          cleanedLabels[idx - width * 2 - 2] !== plateIndex ||
+          cleanedLabels[idx - width * 2] !== plateIndex ||
+          cleanedLabels[idx - 2] !== plateIndex
+        );
+        const brRecessed = (x < width - bevel - 1 && y < height - bevel - 1) && (
+          cleanedLabels[idx + width + 1] !== plateIndex ||
+          cleanedLabels[idx + width] !== plateIndex ||
+          cleanedLabels[idx + 1] !== plateIndex
+        );
 
-        const woodMod = grain * 0.55 + sheen * 0.42;
-        let r = pr * 0.86 + (118 + woodMod) * 0.14 + woodMod * 0.45;
-        let g = pg * 0.86 + (70 + woodMod * 0.7) * 0.14 + woodMod * 0.38;
-        let b = pb * 0.86 + (38 + woodMod * 0.45) * 0.14 + woodMod * 0.30;
+        const woodMod = grain * 0.48 + sheen * 0.38;
+        let r = pr * 0.88 + (126 + woodMod) * 0.12 + woodMod * 0.42;
+        let g = pg * 0.88 + (76 + woodMod * 0.7) * 0.12 + woodMod * 0.35;
+        let b = pb * 0.88 + (42 + woodMod * 0.45) * 0.12 + woodMod * 0.28;
 
         if (tlRecessed) {
           if (isInkPlate) {
-            r += 62; g += 40; b += 22;
+            r += 86; g += 58; b += 34;
           } else {
-            r += 38; g += 32; b += 24;
+            r += 54; g += 44; b += 32;
           }
+        } else if (tlInner) {
+          r += 24; g += 18; b += 12;
         } else if (brRecessed) {
-          r -= 20; g -= 18; b -= 14;
+          r -= 24; g -= 20; b -= 16;
         }
 
-        out[outIdx] = clampByte(Math.round(r), 12, 252);
-        out[outIdx + 1] = clampByte(Math.round(g), 10, 248);
-        out[outIdx + 2] = clampByte(Math.round(b), 8, 240);
+        out[outIdx] = clampByte(Math.round(r), 14, 255);
+        out[outIdx + 1] = clampByte(Math.round(g), 12, 252);
+        out[outIdx + 2] = clampByte(Math.round(b), 10, 245);
         out[outIdx + 3] = 255;
         continue;
       }
 
-      const gougeRipple = Math.sin((y + (x >> 2)) * 0.68 + xGouge[x]) * 4.8;
-      let recessDelta = grain * 0.88 + sheen * 0.55 + gougeRipple;
-
-      if (x <= bevel + 2 || y <= bevel + 2) {
-        recessDelta -= (x === bevel || y === bevel) ? 34 : 18;
-      } else if (x >= width - bevel - 2 || y >= height - bevel - 2) {
-        recessDelta += 12;
+      let seWallDist = 0;
+      const maxCheck = Math.min(7, x - bevel, y - bevel);
+      for (let d = 1; d <= maxCheck; d++) {
+        if (
+          cleanedLabels[idx - d * width - d] === plateIndex ||
+          cleanedLabels[idx - d * width] === plateIndex ||
+          cleanedLabels[idx - d] === plateIndex
+        ) {
+          seWallDist = d;
+          break;
+        }
       }
 
-      const ul1 = (cleanedLabels[idx - width - 1] === plateIndex)
-        || (cleanedLabels[idx - width] === plateIndex)
-        || (cleanedLabels[idx - 1] === plateIndex);
-      const ul2 = !ul1 && x > bevel + 1 && y > bevel + 1 && (
-        cleanedLabels[idx - width * 2 - 2] === plateIndex ||
-        cleanedLabels[idx - width * 2 - 1] === plateIndex ||
-        cleanedLabels[idx - width - 2] === plateIndex
-      );
-      const ul3 = !ul1 && !ul2 && x > bevel + 2 && y > bevel + 2 && (
-        cleanedLabels[idx - width * 3 - 3] === plateIndex ||
-        cleanedLabels[idx - width * 2 - 3] === plateIndex ||
-        cleanedLabels[idx - width * 3 - 2] === plateIndex
-      );
+      let nwSlopeDist = 0;
+      if (seWallDist === 0 && x < width - bevel - 2 && y < height - bevel - 2) {
+        if (
+          cleanedLabels[idx + width + 1] === plateIndex ||
+          cleanedLabels[idx + width] === plateIndex ||
+          cleanedLabels[idx + 1] === plateIndex
+        ) {
+          nwSlopeDist = 1;
+        } else if (
+          cleanedLabels[idx + width * 2 + 2] === plateIndex ||
+          cleanedLabels[idx + width * 2] === plateIndex ||
+          cleanedLabels[idx + 2] === plateIndex
+        ) {
+          nwSlopeDist = 2;
+        }
+      }
 
-      const dr1 = (cleanedLabels[idx + width + 1] === plateIndex)
-        || (cleanedLabels[idx + width] === plateIndex)
-        || (cleanedLabels[idx + 1] === plateIndex);
-      const dr2 = !dr1 && x < width - bevel - 2 && y < height - bevel - 2 && (
-        cleanedLabels[idx + width * 2 + 2] === plateIndex
-      );
+      if (nwSlopeDist > 0) {
+        const slopeBoost = nwSlopeDist === 1 ? 46 : 24;
+        const slopeDelta = grain * 0.55 + sheen * 0.45 + slopeBoost;
+        out[outIdx] = clampByte(Math.round(118 + slopeDelta), 45, 242);
+        out[outIdx + 1] = clampByte(Math.round(72 + slopeDelta * 0.72), 28, 196);
+        out[outIdx + 2] = clampByte(Math.round(38 + slopeDelta * 0.48), 14, 138);
+        out[outIdx + 3] = 255;
+        continue;
+      }
 
-      if (ul1) recessDelta -= 44;
-      else if (ul2) recessDelta -= 28;
-      else if (ul3) recessDelta -= 14;
-      else if (dr1) recessDelta += 22;
-      else if (dr2) recessDelta += 10;
+      if (seWallDist > 0) {
+        if (seWallDist <= 4) {
+          const knifeStriation = Math.sin((x - y) * 1.35) * 9;
+          const wallShade = seWallDist === 1 ? 14 : (seWallDist === 2 ? -6 : (seWallDist === 3 ? -22 : -34));
+          const wallDelta = grain * 0.5 + sheen * 0.35 + wallShade + knifeStriation;
+          out[outIdx] = clampByte(Math.round(106 + wallDelta), 22, 215);
+          out[outIdx + 1] = clampByte(Math.round(62 + wallDelta * 0.68), 12, 162);
+          out[outIdx + 2] = clampByte(Math.round(32 + wallDelta * 0.46), 6, 108);
+          out[outIdx + 3] = 255;
+          continue;
+        } else {
+          const aoShade = seWallDist === 5 ? -46 : (seWallDist === 6 ? -30 : -16);
+          const aoDelta = grain * 0.5 + sheen * 0.35 + aoShade;
+          out[outIdx] = clampByte(Math.round(76 + aoDelta), 14, 175);
+          out[outIdx + 1] = clampByte(Math.round(42 + aoDelta * 0.64), 8, 125);
+          out[outIdx + 2] = clampByte(Math.round(21 + aoDelta * 0.42), 4, 82);
+          out[outIdx + 3] = 255;
+          continue;
+        }
+      }
 
-      out[outIdx] = clampByte(Math.round(86 + recessDelta), 18, 210);
-      out[outIdx + 1] = clampByte(Math.round(48 + recessDelta * 0.64), 10, 155);
-      out[outIdx + 2] = clampByte(Math.round(25 + recessDelta * 0.42), 5, 105);
+      const scoopRow = Math.floor((y + Math.sin(x * 0.08) * 1.6) / 6);
+      const scoopPhase = ((y + Math.sin(x * 0.08) * 1.6) % 6 + 6) % 6;
+      const scoopCol = (x + (scoopRow % 2) * 13) % 26;
+      let chiselCarve = 0;
+      if (scoopPhase < 1.1) {
+        chiselCarve = 21;
+      } else if (scoopPhase < 2.4) {
+        chiselCarve = -19;
+      } else {
+        chiselCarve = (scoopPhase - 3.6) * 6.5;
+      }
+      if (scoopCol < 1.6) {
+        chiselCarve += 12;
+      } else if (scoopCol > 24.2) {
+        chiselCarve -= 12;
+      }
+
+      let recessDelta = grain * 0.82 + sheen * 0.48 + chiselCarve;
+
+      if (x <= bevel + 3 || y <= bevel + 3) {
+        recessDelta -= (x <= bevel + 1 || y <= bevel + 1) ? 38 : 20;
+      } else if (x >= width - bevel - 3 || y >= height - bevel - 3) {
+        recessDelta += 16;
+      }
+
+      out[outIdx] = clampByte(Math.round(78 + recessDelta), 16, 205);
+      out[outIdx + 1] = clampByte(Math.round(44 + recessDelta * 0.64), 9, 148);
+      out[outIdx + 2] = clampByte(Math.round(22 + recessDelta * 0.42), 4, 98);
       out[outIdx + 3] = 255;
     }
   }

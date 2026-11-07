@@ -5121,24 +5121,44 @@ page {
 
 .advanced-board-preview-close {
   position: absolute;
-  top: calc(env(safe-area-inset-top) + 24rpx);
-  left: 28rpx;
-  z-index: 5;
-  width: 64rpx;
-  height: 64rpx;
+  top: calc(env(safe-area-inset-top, 44px) + 104rpx);
+  left: 32rpx;
+  z-index: 25;
+  padding: 0 26rpx;
+  height: 76rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8rpx;
   color: #fff7e6;
+  background: rgba(34, 18, 10, 0.88);
+  border: 2rpx solid rgba(232, 191, 106, 0.55);
+  border-radius: 999rpx;
+  box-shadow: 0 8rpx 22rpx rgba(0, 0, 0, 0.55);
+}
+
+.advanced-board-preview-close:active {
+  transform: scale(0.95);
+  background: rgba(68, 34, 18, 0.95);
+}
+
+.advanced-board-preview-close-icon {
   font-size: 38rpx;
-  background: rgba(255, 247, 230, 0.08);
-  border: 1rpx solid rgba(255, 247, 230, 0.2);
-  border-radius: 4rpx;
+  line-height: 1;
+  color: #f2c94c;
+  font-weight: 700;
+}
+
+.advanced-board-preview-close-label {
+  font-size: 26rpx;
+  color: #fff7e6;
+  font-weight: 600;
+  letter-spacing: 2rpx;
 }
 
 .advanced-board-preview-stage {
   position: absolute;
-  inset: 120rpx 32rpx 150rpx;
+  inset: 180rpx 32rpx 220rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5148,8 +5168,8 @@ page {
 
 .advanced-board-preview-object {
   position: relative;
-  width: 88vw;
-  height: 68vh;
+  width: 86vw;
+  height: 62vh;
   transform-style: preserve-3d;
   transform-origin: center center;
 }
@@ -5161,30 +5181,111 @@ page {
   height: 100%;
 }
 
-.advanced-board-preview-back {
-  opacity: 0.66;
-  filter: brightness(0.38) sepia(0.48);
-  transform: translateZ(-18rpx) translateX(10rpx);
+/* 10层无缝实心梨木厚板切片：每 2rpx 紧密排布，旋转时呈现浑然一体的实木侧边厚度，零缝隙 */
+.advanced-board-slab-9 {
+  filter: brightness(0.32) sepia(0.55) saturate(1.2);
+  transform: translateZ(-18rpx);
+}
+.advanced-board-slab-8 {
+  filter: brightness(0.35) sepia(0.52) saturate(1.2);
+  transform: translateZ(-16rpx);
+}
+.advanced-board-slab-7 {
+  filter: brightness(0.38) sepia(0.50) saturate(1.2);
+  transform: translateZ(-14rpx);
+}
+.advanced-board-slab-6 {
+  filter: brightness(0.41) sepia(0.48) saturate(1.18);
+  transform: translateZ(-12rpx);
+}
+.advanced-board-slab-5 {
+  filter: brightness(0.44) sepia(0.45) saturate(1.15);
+  transform: translateZ(-10rpx);
+}
+.advanced-board-slab-4 {
+  filter: brightness(0.48) sepia(0.42) saturate(1.15);
+  transform: translateZ(-8rpx);
+}
+.advanced-board-slab-3 {
+  filter: brightness(0.52) sepia(0.38) saturate(1.12);
+  transform: translateZ(-6rpx);
+}
+.advanced-board-slab-2 {
+  filter: brightness(0.58) sepia(0.34) saturate(1.1);
+  transform: translateZ(-4rpx);
+}
+.advanced-board-slab-1 {
+  filter: brightness(0.66) sepia(0.28) saturate(1.06);
+  transform: translateZ(-2rpx);
 }
 
-.advanced-board-preview-mid {
-  opacity: 0.8;
-  filter: brightness(0.52) sepia(0.32);
-  transform: translateZ(-9rpx) translateX(5rpx);
-}
-
+/* 0rpx 雕版铲底凹槽基准面（承载圆刀铲底刻痕与凹陷木底） */
 .advanced-board-preview-front {
-  transform: translateZ(2rpx);
-  backface-visibility: hidden;
+  transform: translateZ(0rpx);
 }
 
-.advanced-board-preview-name {
+/* +2rpx ~ +10rpx 阳刻凸起木台立面壁（仅在有色图案处向上拔起 10rpx 梨木底座，无色区保持在 0rpx 凹槽内） */
+.advanced-board-relief-wall-1 {
+  filter: brightness(0.46) sepia(0.92) saturate(2.1) hue-rotate(-14deg) contrast(1.15);
+  transform: translateZ(2rpx);
+}
+.advanced-board-relief-wall-2 {
+  filter: brightness(0.54) sepia(0.88) saturate(2.0) hue-rotate(-12deg) contrast(1.15);
+  transform: translateZ(4rpx);
+}
+.advanced-board-relief-wall-3 {
+  filter: brightness(0.62) sepia(0.85) saturate(1.9) hue-rotate(-10deg) contrast(1.12);
+  transform: translateZ(6rpx);
+}
+.advanced-board-relief-wall-4 {
+  filter: brightness(0.70) sepia(0.80) saturate(1.8) hue-rotate(-8deg) contrast(1.10);
+  transform: translateZ(8rpx);
+}
+.advanced-board-relief-wall-5 {
+  filter: brightness(0.78) sepia(0.72) saturate(1.6) hue-rotate(-6deg) contrast(1.08);
+  transform: translateZ(10rpx);
+}
+
+/* +12rpx 阳刻受墨顶面（高高凸起于铲底木槽之上） */
+.advanced-board-relief-top {
+  transform: translateZ(12rpx);
+  filter: contrast(1.08) saturate(1.08) drop-shadow(0 3rpx 5rpx rgba(0, 0, 0, 0.55));
+}
+
+.advanced-board-preview-footer {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(env(safe-area-inset-bottom) + 62rpx);
+  bottom: calc(env(safe-area-inset-bottom, 20px) + 36rpx);
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.advanced-board-preview-name {
   color: #f2c94c;
-  font-size: 28rpx;
+  font-size: 30rpx;
   text-align: center;
   font-family: "STXingkai", "华文行楷", "FZKai-Z03", "KaiTi", cursive;
+}
+
+.advanced-board-preview-hint {
+  color: rgba(255, 247, 230, 0.58);
+  font-size: 22rpx;
+  letter-spacing: 2rpx;
+}
+
+.advanced-board-preview-exit-btn {
+  margin-top: 6rpx;
+  padding: 16rpx 48rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, rgba(158, 39, 36, 0.92) 0%, rgba(104, 22, 20, 0.95) 100%);
+  border: 2rpx solid rgba(232, 191, 106, 0.68);
+  color: #fff7e6;
+  font-size: 26rpx;
+  font-weight: 600;
+  letter-spacing: 3rpx;
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.55);
 }

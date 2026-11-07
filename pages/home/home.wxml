@@ -765,9 +765,12 @@
     </view>
   </view>
 
-  <!-- ═══════════ 卷五木板2.5D放大展示 ═══════════ -->
+  <!-- ═══════════ 卷五木板 3D 阳刻浮雕特写展厅 ═══════════ -->
   <view class="advanced-board-preview-modal" wx:if="{{advancedBoardPreviewOpen}}" catchtap="closeAdvancedBoardPreview">
-    <view class="advanced-board-preview-close" catchtap="closeAdvancedBoardPreview">×</view>
+    <view class="advanced-board-preview-close" catchtap="closeAdvancedBoardPreview">
+      <text class="advanced-board-preview-close-icon">×</text>
+      <text class="advanced-board-preview-close-label">返回</text>
+    </view>
     <view
       class="advanced-board-preview-stage"
       catchtap="noop"
@@ -780,12 +783,34 @@
         class="advanced-board-preview-object"
         style="transform:scale({{advancedBoardPreviewScale}}) rotateX({{advancedBoardPreviewRotateX}}deg) rotateY({{advancedBoardPreviewRotateY}}deg);"
       >
-        <image class="advanced-board-preview-layer advanced-board-preview-back" src="{{advancedBoardPreview.boardImage}}" mode="aspectFit"></image>
-        <image class="advanced-board-preview-layer advanced-board-preview-mid" src="{{advancedBoardPreview.boardImage}}" mode="aspectFit"></image>
+        <!-- 第一层组：10层无缝紧密叠合的实心梨木厚板底座 (-18rpx ~ 0rpx，每2rpx一层，彻底消除PNG夹层缝隙) -->
+        <image class="advanced-board-preview-layer advanced-board-slab-9" src="{{advancedBoardPreview.boardImage}}" mode="aspectFit"></image>
+        <image class="advanced-board-preview-layer advanced-board-slab-8" src="{{advancedBoardPreview.boardImage}}" mode="aspectFit"></image>
+        <image class="advanced-board-preview-layer advanced-board-slab-7" src="{{advancedBoardPreview.boardImage}}" mode="aspectFit"></image>
+        <image class="advanced-board-preview-layer advanced-board-slab-6" src="{{advancedBoardPreview.boardImage}}" mode="aspectFit"></image>
+        <image class="advanced-board-preview-layer advanced-board-slab-5" src="{{advancedBoardPreview.boardImage}}" mode="aspectFit"></image>
+        <image class="advanced-board-preview-layer advanced-board-slab-4" src="{{advancedBoardPreview.boardImage}}" mode="aspectFit"></image>
+        <image class="advanced-board-preview-layer advanced-board-slab-3" src="{{advancedBoardPreview.boardImage}}" mode="aspectFit"></image>
+        <image class="advanced-board-preview-layer advanced-board-slab-2" src="{{advancedBoardPreview.boardImage}}" mode="aspectFit"></image>
+        <image class="advanced-board-preview-layer advanced-board-slab-1" src="{{advancedBoardPreview.boardImage}}" mode="aspectFit"></image>
         <image class="advanced-board-preview-layer advanced-board-preview-front" src="{{advancedBoardPreview.boardImage}}" mode="aspectFit"></image>
+
+        <!-- 第二层组：独立向上凸起的阳刻色块木立面与受墨层 (+2rpx ~ +14rpx，仅透明PNG有色区拔高凸起，无色区留在0rpx圆刀铲底凹槽) -->
+        <block wx:if="{{advancedBoardPreview.layerImage}}">
+          <image class="advanced-board-preview-layer advanced-board-relief-wall-1" src="{{advancedBoardPreview.layerImage}}" mode="aspectFit"></image>
+          <image class="advanced-board-preview-layer advanced-board-relief-wall-2" src="{{advancedBoardPreview.layerImage}}" mode="aspectFit"></image>
+          <image class="advanced-board-preview-layer advanced-board-relief-wall-3" src="{{advancedBoardPreview.layerImage}}" mode="aspectFit"></image>
+          <image class="advanced-board-preview-layer advanced-board-relief-wall-4" src="{{advancedBoardPreview.layerImage}}" mode="aspectFit"></image>
+          <image class="advanced-board-preview-layer advanced-board-relief-wall-5" src="{{advancedBoardPreview.layerImage}}" mode="aspectFit"></image>
+          <image class="advanced-board-preview-layer advanced-board-relief-top" src="{{advancedBoardPreview.layerImage}}" mode="aspectFit"></image>
+        </block>
       </view>
     </view>
-    <text class="advanced-board-preview-name">{{advancedBoardPreview.name}}</text>
+    <view class="advanced-board-preview-footer" catchtap="noop">
+      <text class="advanced-board-preview-name">{{advancedBoardPreview.name}} · 阳刻浮雕木版</text>
+      <text class="advanced-board-preview-hint">单指拖动 3D 旋转观察刀刻凸起 · 双指缩放</text>
+      <view class="advanced-board-preview-exit-btn" catchtap="closeAdvancedBoardPreview">✕ 退出木板特写</view>
+    </view>
   </view>
 
   <!-- ═══════════ 卷五内嵌数字二创 ═══════════ -->

@@ -983,74 +983,144 @@ function generateCarvedWoodblockPngBuffer(cleanedLabels, plateIndex, plateRgb, s
 
       const raised = labels[idx] === plateIndex;
       if (raised) {
-        const tlRecessed = (labels[idx - width - 1] !== plateIndex)
-          || (labels[idx - width] !== plateIndex)
-          || (labels[idx - 1] !== plateIndex);
-        const brRecessed = (labels[idx + width + 1] !== plateIndex)
-          || (labels[idx + width] !== plateIndex)
-          || (labels[idx + 1] !== plateIndex);
+        const tlRecessed = (x > bevel && y > bevel) && (
+          labels[idx - width - 1] !== plateIndex ||
+          labels[idx - width] !== plateIndex ||
+          labels[idx - 1] !== plateIndex
+        );
+        const tlInner = !tlRecessed && (x > bevel + 1 && y > bevel + 1) && (
+          labels[idx - width * 2 - 2] !== plateIndex ||
+          labels[idx - width * 2] !== plateIndex ||
+          labels[idx - 2] !== plateIndex
+        );
+        const brRecessed = (x < width - bevel - 1 && y < height - bevel - 1) && (
+          labels[idx + width + 1] !== plateIndex ||
+          labels[idx + width] !== plateIndex ||
+          labels[idx + 1] !== plateIndex
+        );
 
-        const woodMod = grain * 0.55 + sheen * 0.42;
-        let r = pr * 0.86 + (118 + woodMod) * 0.14 + woodMod * 0.45;
-        let g = pg * 0.86 + (70 + woodMod * 0.7) * 0.14 + woodMod * 0.38;
-        let b = pb * 0.86 + (38 + woodMod * 0.45) * 0.14 + woodMod * 0.30;
+        const woodMod = grain * 0.48 + sheen * 0.38;
+        let r = pr * 0.88 + (126 + woodMod) * 0.12 + woodMod * 0.42;
+        let g = pg * 0.88 + (76 + woodMod * 0.7) * 0.12 + woodMod * 0.35;
+        let b = pb * 0.88 + (42 + woodMod * 0.45) * 0.12 + woodMod * 0.28;
 
+        // 阳刻受墨顶面：左上刀口高光棱线 + 右下受墨边缘厚重感
         if (tlRecessed) {
           if (isInkPlate) {
-            r += 62; g += 40; b += 22;
+            r += 86; g += 58; b += 34;
           } else {
-            r += 38; g += 32; b += 24;
+            r += 54; g += 44; b += 32;
           }
+        } else if (tlInner) {
+          r += 24; g += 18; b += 12;
         } else if (brRecessed) {
-          r -= 20; g -= 18; b -= 14;
+          r -= 24; g -= 20; b -= 16;
         }
 
-        out[outIdx] = clamp(Math.round(r), 12, 252);
-        out[outIdx + 1] = clamp(Math.round(g), 10, 248);
-        out[outIdx + 2] = clamp(Math.round(b), 8, 240);
+        out[outIdx] = clamp(Math.round(r), 14, 255);
+        out[outIdx + 1] = clamp(Math.round(g), 12, 252);
+        out[outIdx + 2] = clamp(Math.round(b), 10, 245);
         out[outIdx + 3] = 255;
         continue;
       }
 
-      const gougeRipple = Math.sin((y + (x >> 2)) * 0.72 + xGouge[x]) * 4.8;
-      let recessDelta = grain * 0.88 + sheen * 0.55 + gougeRipple;
-
-      if (x <= bevel + 2 || y <= bevel + 2) {
-        recessDelta -= (x === bevel || y === bevel) ? 34 : 18;
-      } else if (x >= width - bevel - 2 || y >= height - bevel - 2) {
-        recessDelta += 12;
+      // 检测是否处于阳刻凸起色块四周的「斜刀木台立面壁 (1~5px)」与「刀根深槽暗影 (6~7px)」
+      let seWallDist = 0; // 右下背光立面壁距离 (1..7)
+      const maxCheck = Math.min(7, x - bevel, y - bevel);
+      for (let d = 1; d <= maxCheck; d++) {
+        if (
+          labels[idx - d * width - d] === plateIndex ||
+          labels[idx - d * width] === plateIndex ||
+          labels[idx - d] === plateIndex
+        ) {
+          seWallDist = d;
+          break;
+        }
       }
 
-      const ul1 = (labels[idx - width - 1] === plateIndex)
-        || (labels[idx - width] === plateIndex)
-        || (labels[idx - 1] === plateIndex);
-      const ul2 = !ul1 && x > bevel + 1 && y > bevel + 1 && (
-        labels[idx - width * 2 - 2] === plateIndex ||
-        labels[idx - width * 2 - 1] === plateIndex ||
-        labels[idx - width - 2] === plateIndex
-      );
-      const ul3 = !ul1 && !ul2 && x > bevel + 2 && y > bevel + 2 && (
-        labels[idx - width * 3 - 3] === plateIndex ||
-        labels[idx - width * 2 - 3] === plateIndex ||
-        labels[idx - width * 3 - 2] === plateIndex
-      );
+      let nwSlopeDist = 0; // 左上迎光斜刀坡面 (1..2)
+      if (seWallDist === 0 && x < width - bevel - 2 && y < height - bevel - 2) {
+        if (
+          labels[idx + width + 1] === plateIndex ||
+          labels[idx + width] === plateIndex ||
+          labels[idx + 1] === plateIndex
+        ) {
+          nwSlopeDist = 1;
+        } else if (
+          labels[idx + width * 2 + 2] === plateIndex ||
+          labels[idx + width * 2] === plateIndex ||
+          labels[idx + 2] === plateIndex
+        ) {
+          nwSlopeDist = 2;
+        }
+      }
 
-      const dr1 = (labels[idx + width + 1] === plateIndex)
-        || (labels[idx + width] === plateIndex)
-        || (labels[idx + 1] === plateIndex);
-      const dr2 = !dr1 && x < width - bevel - 2 && y < height - bevel - 2 && (
-        labels[idx + width * 2 + 2] === plateIndex
-      );
+      // 1) 左上迎光斜刀木坡：呈现鲜明浅金梨木刀口斜面，强化凸起立体高度
+      if (nwSlopeDist > 0) {
+        const slopeBoost = nwSlopeDist === 1 ? 46 : 24;
+        const slopeDelta = grain * 0.55 + sheen * 0.45 + slopeBoost;
+        out[outIdx] = clamp(Math.round(118 + slopeDelta), 45, 242);
+        out[outIdx + 1] = clamp(Math.round(72 + slopeDelta * 0.72), 28, 196);
+        out[outIdx + 2] = clamp(Math.round(38 + slopeDelta * 0.48), 14, 138);
+        out[outIdx + 3] = 255;
+        continue;
+      }
 
-      if (ul1) recessDelta -= 44;
-      else if (ul2) recessDelta -= 28;
-      else if (ul3) recessDelta -= 14;
-      else if (dr1) recessDelta += 22;
-      else if (dr2) recessDelta += 10;
+      // 2) 右下 5px 厚阳刻木台立面壁：带有竖向刀削木茬纹理的立体侧壁 + 底部 2px 刀根深谷暗影
+      if (seWallDist > 0) {
+        if (seWallDist <= 4) {
+          // 立体木壁侧面：由浅木肩过渡至深木壁，叠加斜向刀痕条纹
+          const knifeStriation = Math.sin((x - y) * 1.35) * 9;
+          const wallShade = seWallDist === 1 ? 14 : (seWallDist === 2 ? -6 : (seWallDist === 3 ? -22 : -34));
+          const wallDelta = grain * 0.5 + sheen * 0.35 + wallShade + knifeStriation;
+          out[outIdx] = clamp(Math.round(106 + wallDelta), 22, 215);
+          out[outIdx + 1] = clamp(Math.round(62 + wallDelta * 0.68), 12, 162);
+          out[outIdx + 2] = clamp(Math.round(32 + wallDelta * 0.46), 6, 108);
+          out[outIdx + 3] = 255;
+          continue;
+        } else {
+          // d = 5..7：阳刻木壁根部的深邃刀槽环境光遮蔽 (AO Shadow)
+          const aoShade = seWallDist === 5 ? -46 : (seWallDist === 6 ? -30 : -16);
+          const aoDelta = grain * 0.5 + sheen * 0.35 + aoShade;
+          out[outIdx] = clamp(Math.round(76 + aoDelta), 14, 175);
+          out[outIdx + 1] = clamp(Math.round(42 + aoDelta * 0.64), 8, 125);
+          out[outIdx + 2] = clamp(Math.round(21 + aoDelta * 0.42), 4, 82);
+          out[outIdx + 3] = 255;
+          continue;
+        }
+      }
 
-      out[outIdx] = clamp(Math.round(86 + recessDelta), 18, 210);
-      out[outIdx + 1] = clamp(Math.round(48 + recessDelta * 0.64), 10, 155);
-      out[outIdx + 2] = clamp(Math.round(25 + recessDelta * 0.42), 5, 105);
+      // 3) 凹陷铲底木纹层：刻画手工圆刀 (U-Gouge) 错落铲底凹槽与刀脊高光
+      const scoopRow = Math.floor((y + Math.sin(x * 0.08) * 1.6) / 6);
+      const scoopPhase = ((y + Math.sin(x * 0.08) * 1.6) % 6 + 6) % 6;
+      const scoopCol = (x + (scoopRow % 2) * 13) % 26;
+      // 圆刀凹槽截面：顶部刀口暗(-18) -> 槽底过渡 -> 底部刀脊亮(+22)
+      let chiselCarve = 0;
+      if (scoopPhase < 1.1) {
+        chiselCarve = 21; // 圆刀交界凸起木脊高光
+      } else if (scoopPhase < 2.4) {
+        chiselCarve = -19; // 圆刀切入凹槽背光面
+      } else {
+        chiselCarve = (scoopPhase - 3.6) * 6.5;
+      }
+      // 每段圆刀收刀弧痕
+      if (scoopCol < 1.6) {
+        chiselCarve += 12;
+      } else if (scoopCol > 24.2) {
+        chiselCarve -= 12;
+      }
+
+      let recessDelta = grain * 0.82 + sheen * 0.48 + chiselCarve;
+
+      if (x <= bevel + 3 || y <= bevel + 3) {
+        recessDelta -= (x <= bevel + 1 || y <= bevel + 1) ? 38 : 20;
+      } else if (x >= width - bevel - 3 || y >= height - bevel - 3) {
+        recessDelta += 16;
+      }
+
+      out[outIdx] = clamp(Math.round(78 + recessDelta), 16, 205);
+      out[outIdx + 1] = clamp(Math.round(44 + recessDelta * 0.64), 9, 148);
+      out[outIdx + 2] = clamp(Math.round(22 + recessDelta * 0.42), 4, 98);
       out[outIdx + 3] = 255;
     }
   }

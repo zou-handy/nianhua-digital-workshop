@@ -1,7 +1,8 @@
 <view class="viewer-page">
-  <!-- 悬浮返回按钮 -->
+  <!-- 悬浮返回按钮（适配刘海屏与胶囊高度） -->
   <view class="float-back-btn" bindtap="goBack">
     <text class="float-back-icon">←</text>
+    <text class="float-back-label">返回</text>
   </view>
 
   <!-- AI生成内容显著标识 -->
@@ -10,7 +11,7 @@
     <text class="ai-generated-text">本3D模型由人工智能（AI）生成</text>
   </view>
   <view class="procedural-generated-badge" wx:else>
-    <view class="procedural-generated-tag">程序木板</view>
+    <view class="procedural-generated-tag">阳刻梨木雕版</view>
   </view>
 
   <!-- WebGL Canvas 全屏 -->
@@ -24,18 +25,19 @@
     bindtouchcancel="onTouchEnd"
   ></canvas>
 
-  <!-- 底部模型名称 -->
+  <!-- 底部模型名称与一键退出按钮 -->
   <view class="model-name-bar">
     <view class="model-name-row">
       <text class="model-name-text">{{modelName}}</text>
       <view wx:if="{{!isProcedural}}" class="model-ai-tag">AI生成</view>
-      <view wx:else class="model-procedural-tag">PNG轮廓</view>
+      <view wx:else class="model-procedural-tag">阳刻浮雕</view>
     </view>
   </view>
 
-  <!-- 底部提示 -->
+  <!-- 底部提示与退出按钮 -->
   <view class="hint-bar">
     <text class="hint-text">单指旋转 · 双指缩放</text>
+    <view class="bottom-exit-btn" bindtap="goBack">✕ 退出木板特写</view>
   </view>
 
   <!-- 加载中 -->

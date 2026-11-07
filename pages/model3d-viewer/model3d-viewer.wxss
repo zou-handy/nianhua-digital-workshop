@@ -10,35 +10,47 @@ page {
   background: #0a0a14;
 }
 
-/* 悬浮返回按钮 */
+/* 悬浮返回按钮（下移避开手机状态栏与胶囊高度，方便单手点击） */
 .float-back-btn {
   position: fixed;
-  top: 40rpx;
-  left: 30rpx;
-  width: 72rpx;
-  height: 72rpx;
-  background: rgba(255, 255, 255, 0.25);
-  border-radius: 50%;
+  top: calc(env(safe-area-inset-top, 44px) + 96rpx);
+  left: 32rpx;
+  padding: 0 28rpx;
+  height: 76rpx;
+  background: rgba(34, 18, 10, 0.88);
+  border: 2rpx solid rgba(232, 191, 106, 0.55);
+  border-radius: 999rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8rpx;
   z-index: 150;
+  box-shadow: 0 8rpx 22rpx rgba(0, 0, 0, 0.55);
 }
 
 .float-back-btn:active {
-  background: rgba(255, 255, 255, 0.4);
+  transform: scale(0.95);
+  background: rgba(68, 34, 18, 0.95);
 }
 
 .float-back-icon {
-  color: #fff;
-  font-size: 38rpx;
+  color: #f2c94c;
+  font-size: 36rpx;
   font-weight: bold;
+  line-height: 1;
+}
+
+.float-back-label {
+  color: #fff7e6;
+  font-size: 26rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
 }
 
 /* 底部模型名称 */
 .model-name-bar {
   position: absolute;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 100rpx);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 178rpx);
   left: 0;
   width: 100%;
   text-align: center;
@@ -74,7 +86,7 @@ page {
 /* 顶部AI生成内容显著标识 */
 .ai-generated-badge {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 40rpx);
+  top: calc(env(safe-area-inset-top, 44px) + 96rpx);
   right: 30rpx;
   z-index: 150;
   display: flex;
@@ -106,7 +118,7 @@ page {
 
 .procedural-generated-badge {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 40rpx);
+  top: calc(env(safe-area-inset-top, 44px) + 96rpx);
   right: 30rpx;
   z-index: 150;
   pointer-events: none;
@@ -124,23 +136,38 @@ page {
   border-radius: 4rpx;
 }
 
-/* 底部提示 */
+/* 底部提示与退出按钮 */
 .hint-bar {
   position: absolute;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 40rpx);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 36rpx);
   left: 0;
   width: 100%;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
   z-index: 100;
 }
 
 .hint-text {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.45);
   font-size: 24rpx;
   letter-spacing: 4rpx;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 12rpx 40rpx;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 10rpx 36rpx;
   border-radius: 30rpx;
+}
+
+.bottom-exit-btn {
+  padding: 16rpx 48rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, rgba(158, 39, 36, 0.92) 0%, rgba(104, 22, 20, 0.95) 100%);
+  border: 2rpx solid rgba(232, 191, 106, 0.68);
+  color: #fff7e6;
+  font-size: 26rpx;
+  font-weight: 600;
+  letter-spacing: 3rpx;
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.55);
 }
 
 /* 加载遮罩 */
