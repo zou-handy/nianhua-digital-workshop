@@ -328,7 +328,7 @@ async function runEdgeWoodblockSplit(imageSource, payload = {}) {
     rawH = img.height;
   }
 
-  const maxDim = 260;
+  const maxDim = 340;
   const scale = Math.min(1, maxDim / Math.max(rawW, rawH));
   const width = Math.max(64, Math.round(rawW * scale));
   const height = Math.max(64, Math.round(rawH * scale));
@@ -342,7 +342,8 @@ async function runEdgeWoodblockSplit(imageSource, payload = {}) {
 
   const separated = separateRgbaToWoodblockPlates(imageData.data, width, height, {
     removeBackground: payload.removeBackground !== false,
-    maxColors: payload.maxColors || 'auto'
+    maxColors: payload.maxColors || 'auto',
+    preserveGradient: payload.preserveGradient !== false
   });
 
   return Object.assign({ success: true }, separated);
@@ -373,7 +374,7 @@ async function runEdgeWoodblockSplitFromRelayLayers(layers, payload = {}) {
 
   const rawW = loadedImages[0].width || 280;
   const rawH = loadedImages[0].height || 280;
-  const maxDim = 260;
+  const maxDim = 340;
   const scale = Math.min(1, maxDim / Math.max(rawW, rawH));
   const width = Math.max(64, Math.round(rawW * scale));
   const height = Math.max(64, Math.round(rawH * scale));
@@ -389,7 +390,8 @@ async function runEdgeWoodblockSplitFromRelayLayers(layers, payload = {}) {
   const imageData = ctx.getImageData(0, 0, width, height);
   const separated = separateRgbaToWoodblockPlates(imageData.data, width, height, {
     removeBackground: payload.removeBackground !== false,
-    maxColors: payload.maxColors || 'auto'
+    maxColors: payload.maxColors || 'auto',
+    preserveGradient: payload.preserveGradient !== false
   });
 
   return Object.assign({ success: true }, separated);

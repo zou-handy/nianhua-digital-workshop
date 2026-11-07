@@ -890,20 +890,79 @@ function separateRgbaToWoodblockPlates(rgba, width, height, options = {}) {
   let cleanedLabels = removeSmallIslands(labels, width, height, numPlates);
   cleanedLabels = ensureNoEmptyDynamicPlates(cleanedLabels, activePlates, luma, LStar, aStar, bStar, bgMask, total);
 
+  // 解耦「木板 3D 浮雕掩码 (cleanedLabels)」与「宣纸保真套印掩码 (printLabels)」：
+  // 1) 木板凸起继续使用去噪合并后的 cleanedLabels，保证梨木阳刻刀路干净利落、无碎麻点
+  // 2) 宣纸套印层使用保留原图眼神光、发丝高光与细腻渐变过渡的 printLabels + 90% 原图真实像素保真着色
+  const printLabels = new Int8Array(cleanedLabels);
+  for (let i = 0; i < total; i++) {
+    if (bgMask[i]) {
+      printLabels[i] = -1;
+      continue;
+    }
+    const px = i * 4;
+    const rawR = rgba[px], rawG = rgba[px + 1], rawB = rgba[px + 2], rawA = rgba[px + 3];
+    if (rawA < 28) {
+      printLabels[i] = -1;
+      continue;
+    }
+    const rawLuma = rgbToLuma(rawR, rawG, rawB);
+    const rawChroma = Math.max(rawR, rawG, rawB) - Math.min(rawR, rawG, rawB);
+
+    // 眼神光与精细纯白高光保护：原图中明亮的小高光点（如瞳孔内的白色眼神光、耳钉高光）不被墨版吞没，直接留白显出璀璨眼神光
+    if (
+      (rawLuma >= 215 && rawChroma <= 28) ||
+      (rawLuma >= 175 && rawLuma - luma[i] >= 28 && rawChroma <= 36)
+    ) {
+      printLabels[i] = -1;
+      continue;
+    }
+
+    // 若原本被判为留白 (-1)，但原图并非纯白底色（例如白衣上的浅灰暖褶皱或浅肤色过渡），归入最接近的浅色版以保留完整渐变
+    if (printLabels[i] < 0 && (rawLuma < 236 || rawChroma > 18)) {
+      const [rL, ra, rb] = rgbToLab(rawR, rawG, rawB);
+      let bestP = 1;
+      let bestD = Infinity;
+      for (let c = 1; c < numPlates; c++) {
+        const [pL, pa, pb] = plateLabs[c];
+        const d = Math.hypot((rL - pL) * 0.55, ra - pa, rb - pb);
+        if (d < bestD) {
+          bestD = d;
+          bestP = c;
+        }
+      }
+      printLabels[i] = bestP;
+    }
+  }
+
+  const preserveGrad = options.preserveGradient !== false;
   const quantizedRgba = new Uint8Array(total * 4);
   for (let i = 0; i < total; i++) {
     const outIdx = i * 4;
-    const c = cleanedLabels[i];
+    const c = printLabels[i];
     if (c < 0) {
-      quantizedRgba[outIdx] = 243;
-      quantizedRgba[outIdx + 1] = 228;
-      quantizedRgba[outIdx + 2] = 196;
-      quantizedRgba[outIdx + 3] = 255;
+      // 眼神光与高光留白处保留原图高光亮色或温润宣纸白
+      if (!bgMask[i] && rgba[outIdx + 3] >= 28) {
+        quantizedRgba[outIdx] = Math.max(243, rgba[outIdx]);
+        quantizedRgba[outIdx + 1] = Math.max(232, rgba[outIdx + 1]);
+        quantizedRgba[outIdx + 2] = Math.max(210, rgba[outIdx + 2]);
+        quantizedRgba[outIdx + 3] = 255;
+      } else {
+        quantizedRgba[outIdx] = 246;
+        quantizedRgba[outIdx + 1] = 236;
+        quantizedRgba[outIdx + 2] = 214;
+        quantizedRgba[outIdx + 3] = 255;
+      }
     } else {
       const rgb = activePlates[c].rgb;
-      quantizedRgba[outIdx] = rgb[0];
-      quantizedRgba[outIdx + 1] = rgb[1];
-      quantizedRgba[outIdx + 2] = rgb[2];
+      if (preserveGrad) {
+        quantizedRgba[outIdx] = Math.round(rgba[outIdx] * 0.90 + rgb[0] * 0.10);
+        quantizedRgba[outIdx + 1] = Math.round(rgba[outIdx + 1] * 0.90 + rgb[1] * 0.10);
+        quantizedRgba[outIdx + 2] = Math.round(rgba[outIdx + 2] * 0.90 + rgb[2] * 0.10);
+      } else {
+        quantizedRgba[outIdx] = rgb[0];
+        quantizedRgba[outIdx + 1] = rgb[1];
+        quantizedRgba[outIdx + 2] = rgb[2];
+      }
       quantizedRgba[outIdx + 3] = 255;
     }
   }
@@ -911,7 +970,7 @@ function separateRgbaToWoodblockPlates(rgba, width, height, options = {}) {
   const layers = [];
   let totalForeground = 0;
   for (let i = 0; i < total; i++) {
-    if (cleanedLabels[i] >= 0) totalForeground++;
+    if (printLabels[i] >= 0) totalForeground++;
   }
 
 /**
@@ -1163,11 +1222,17 @@ function generateCarvedWoodblockPngBuffer(cleanedLabels, plateIndex, plateRgb, s
     const layerRgba = new Uint8Array(total * 4);
     let pixelCount = 0;
     for (let i = 0; i < total; i++) {
-      if (cleanedLabels[i] !== c) continue;
+      if (printLabels[i] !== c) continue;
       const outIdx = i * 4;
-      layerRgba[outIdx] = meta.rgb[0];
-      layerRgba[outIdx + 1] = meta.rgb[1];
-      layerRgba[outIdx + 2] = meta.rgb[2];
+      if (preserveGrad) {
+        layerRgba[outIdx] = Math.round(rgba[outIdx] * 0.90 + meta.rgb[0] * 0.10);
+        layerRgba[outIdx + 1] = Math.round(rgba[outIdx + 1] * 0.90 + meta.rgb[1] * 0.10);
+        layerRgba[outIdx + 2] = Math.round(rgba[outIdx + 2] * 0.90 + meta.rgb[2] * 0.10);
+      } else {
+        layerRgba[outIdx] = meta.rgb[0];
+        layerRgba[outIdx + 1] = meta.rgb[1];
+        layerRgba[outIdx + 2] = meta.rgb[2];
+      }
       layerRgba[outIdx + 3] = 255;
       pixelCount++;
     }

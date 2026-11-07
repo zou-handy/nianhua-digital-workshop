@@ -215,8 +215,43 @@ function processImageBuffer(imageBuffer, options = {}) {
   // 7. 保底检查：确保没有任何一块木版是 0 像素空版（防止卷五版台印出空白）
   ensureNoEmptyPlates(pixelAssignment, workingPixels, width, height, bgMask, plateCount);
 
-  // 8. 生成各色版 PNG 图层与宣纸合成预览图
+  // 8. 生成各色版 PNG 图层与宣纸合成预览图（解耦木板浮雕与宣纸套印层：宣纸套印层保留 90% 原图细腻渐变与眼神光）
   const flattenPalette = options.flattenPalette !== false;
+  const preserveGradient = options.preserveGradient !== false;
+  const printAssignment = new Int8Array(pixelAssignment);
+  const plateLabsForPrint = targetPalette.map((p) => rgbToLab(p.r, p.g, p.b));
+
+  for (let i = 0; i < totalPixels; i++) {
+    if (bgMask[i]) {
+      printAssignment[i] = -1;
+      continue;
+    }
+    const off = i * 4;
+    const rr = rawPixels[off], rg = rawPixels[off + 1], rb = rawPixels[off + 2], ra = rawPixels[off + 3];
+    if (ra <= 16) {
+      printAssignment[i] = -1;
+      continue;
+    }
+    const rLum = (rr * 77 + rg * 150 + rb * 29) >> 8;
+    const sLum = (workingPixels[off] * 77 + workingPixels[off + 1] * 150 + workingPixels[off + 2] * 29) >> 8;
+    const rChroma = Math.max(rr, rg, rb) - Math.min(rr, rg, rb);
+
+    if ((rLum >= 215 && rChroma <= 28) || (rLum >= 175 && rLum - sLum >= 26 && rChroma <= 36)) {
+      printAssignment[i] = -1;
+      continue;
+    }
+    if (printAssignment[i] < 0 && (rLum < 236 || rChroma > 18)) {
+      const [rL, raLab, rbLab] = rgbToLab(rr, rg, rb);
+      let bestP = 1, bestD = Infinity;
+      for (let c = 1; c < plateCount; c++) {
+        const [pL, pa, pb] = plateLabsForPrint[c];
+        const d = Math.hypot((rL - pL) * 0.55, raLab - pa, rbLab - pb);
+        if (d < bestD) { bestD = d; bestP = c; }
+      }
+      printAssignment[i] = bestP;
+    }
+  }
+
   const layers = [];
 
   for (let layerIndex = 0; layerIndex < plateCount; layerIndex++) {
@@ -226,10 +261,20 @@ function processImageBuffer(imageBuffer, options = {}) {
 
     for (let i = 0; i < totalPixels; i++) {
       const offset = i * 4;
-      if (pixelAssignment[i] === layerIndex) {
-        layerPng.data[offset] = flattenPalette ? plate.r : workingPixels[offset];
-        layerPng.data[offset + 1] = flattenPalette ? plate.g : workingPixels[offset + 1];
-        layerPng.data[offset + 2] = flattenPalette ? plate.b : workingPixels[offset + 2];
+      if (printAssignment[i] === layerIndex) {
+        if (!flattenPalette) {
+          layerPng.data[offset] = rawPixels[offset];
+          layerPng.data[offset + 1] = rawPixels[offset + 1];
+          layerPng.data[offset + 2] = rawPixels[offset + 2];
+        } else if (preserveGradient) {
+          layerPng.data[offset] = Math.round(rawPixels[offset] * 0.90 + plate.r * 0.10);
+          layerPng.data[offset + 1] = Math.round(rawPixels[offset + 1] * 0.90 + plate.g * 0.10);
+          layerPng.data[offset + 2] = Math.round(rawPixels[offset + 2] * 0.90 + plate.b * 0.10);
+        } else {
+          layerPng.data[offset] = plate.r;
+          layerPng.data[offset + 1] = plate.g;
+          layerPng.data[offset + 2] = plate.b;
+        }
         layerPng.data[offset + 3] = 255;
         pixelCount++;
       } else {
@@ -259,19 +304,25 @@ function processImageBuffer(imageBuffer, options = {}) {
     });
   }
 
-  // 生成宣纸底色（#FAF3E6）上的四色套印合成图（墨线版置于最顶层压线）
+  // 生成宣纸底色（#FAF3E6）上的套印合成图
   const quantized = new PNG({ width, height });
   for (let i = 0; i < totalPixels; i++) {
     const offset = i * 4;
-    const layerIndex = pixelAssignment[i];
+    const layerIndex = printAssignment[i];
     if (layerIndex >= 0 && layerIndex < plateCount) {
       const plate = targetPalette[layerIndex];
-      quantized.data[offset] = plate.r;
-      quantized.data[offset + 1] = plate.g;
-      quantized.data[offset + 2] = plate.b;
+      if (preserveGradient) {
+        quantized.data[offset] = Math.round(rawPixels[offset] * 0.90 + plate.r * 0.10);
+        quantized.data[offset + 1] = Math.round(rawPixels[offset + 1] * 0.90 + plate.g * 0.10);
+        quantized.data[offset + 2] = Math.round(rawPixels[offset + 2] * 0.90 + plate.b * 0.10);
+      } else {
+        quantized.data[offset] = plate.r;
+        quantized.data[offset + 1] = plate.g;
+        quantized.data[offset + 2] = plate.b;
+      }
       quantized.data[offset + 3] = 255;
     } else {
-      // 传统宣纸暖白底色
+      // 传统宣纸暖白底色或原图高光留白
       quantized.data[offset] = 250;
       quantized.data[offset + 1] = 243;
       quantized.data[offset + 2] = 230;
