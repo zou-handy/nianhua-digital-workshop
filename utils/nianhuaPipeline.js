@@ -349,6 +349,53 @@ async function runEdgeWoodblockSplit(imageSource, payload = {}) {
 }
 
 /**
+ * 将云函数以 flattenPalette:false 转存回来的原图未量化图层在端侧 OffscreenCanvas 还原合成为 100% 原始 RGB，
+ * 避免旧版云函数 Euclidean RGB 聚类把人像暖肤色预量化为红色
+ */
+async function runEdgeWoodblockSplitFromRelayLayers(layers, payload = {}) {
+  const validSources = (Array.isArray(layers) ? layers : [])
+    .map((item) => item && (item.fileID || item.url || item.data))
+    .filter(Boolean);
+  if (!validSources.length) {
+    throw new Error('缺少可合成的云中转图层');
+  }
+
+  const localPaths = await Promise.all(validSources.map((src) => resolveLocalImagePathForCanvas(src)));
+  const probeCanvas = wx.createOffscreenCanvas({ type: '2d', width: 16, height: 16 });
+  const loadedImages = [];
+  for (let i = 0; i < localPaths.length; i++) {
+    const img = await loadCanvasImageWithFallback(probeCanvas, localPaths[i], validSources[i]);
+    if (img) loadedImages.push(img);
+  }
+  if (!loadedImages.length) {
+    throw new Error('云中转图层解码失败');
+  }
+
+  const rawW = loadedImages[0].width || 280;
+  const rawH = loadedImages[0].height || 280;
+  const maxDim = 260;
+  const scale = Math.min(1, maxDim / Math.max(rawW, rawH));
+  const width = Math.max(64, Math.round(rawW * scale));
+  const height = Math.max(64, Math.round(rawH * scale));
+
+  const canvas = wx.createOffscreenCanvas({ type: '2d', width, height });
+  const ctx = canvas.getContext('2d');
+  // 铺设暖白宣纸底色，承接旧版云函数跳过的高亮留白像素 (>220)
+  ctx.fillStyle = '#FAF2E2';
+  ctx.fillRect(0, 0, width, height);
+  for (let i = 0; i < loadedImages.length; i++) {
+    ctx.drawImage(loadedImages[i], 0, 0, width, height);
+  }
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const separated = separateRgbaToWoodblockPlates(imageData.data, width, height, {
+    removeBackground: payload.removeBackground !== false,
+    maxColors: payload.maxColors || 'auto'
+  });
+
+  return Object.assign({ success: true }, separated);
+}
+
+/**
  * 1:1 保构图实拍图转木版年画风格（优先调用混元 3.0 真·图生图 HY-Image-v3.0-I2I-ToB-v1.0.1，离线时无缝回退端侧刀刻平涂引擎）
  * 严格保留实拍图的木雕/建筑/山水/人物构图，转化为宣纸底 + 松烟墨刀刻线 + 3~6 色矿物平涂版画图
  */
@@ -464,15 +511,29 @@ async function requestSplitColors(imageSource, options = {}) {
   }
 
   // 3. 调用云函数 splitColors（云端 Node.js 无域名白名单限制，可直接拉取混元 COS 等任意外部图片并转存至本环境 cloud://）
+  // 关键：传入 flattenPalette:false 与双锚点 palette，使线上旧版云函数直接将 100% 原始未量化像素写入 2 张 cloud:// 图层，杜绝旧版 RGB 聚类将人像暖肤色预量化为红色
   const cloudPayload = Object.assign({}, payload, {
-    maxDimension: 600
+    removeBackground: false,
+    flattenPalette: false,
+    maxColors: 2,
+    palette: ['#282828', '#B8B8B8'],
+    maxDimension: 520
   });
   const cloudResult = await requestSplitColorsViaCloudFunction(cloudPayload);
-  if (cloudResult && String(cloudResult.engineVersion || '').startsWith('2.1')) {
+  if (cloudResult && String(cloudResult.engineVersion || '').startsWith('2.2')) {
     return cloudResult;
   }
 
-  // 4. 用云函数转存回来的本环境白名单 cloud:// 图源交由端侧 v2.1 引擎执行 3~6 版动态多色精修分色
+  // 4A. 优先将云函数以 flattenPalette:false 转存回来的未量化原始图层合成为 100% 原图 RGB，交由端侧开相留白引擎执行 3~6 版动态多色精修分色
+  if (cloudResult && Array.isArray(cloudResult.layers) && cloudResult.layers.length > 0) {
+    try {
+      return await runEdgeWoodblockSplitFromRelayLayers(cloudResult.layers, payload);
+    } catch (relayLayersErr) {
+      console.warn('[nianhuaPipeline] 原图图层合成精修降级:', relayLayersErr);
+    }
+  }
+
+  // 4B. 备选：用云函数返回的 quantizedFileID 交由端侧精修
   const relaySource = (cloudResult && (cloudResult.quantizedFileID || cloudResult.quantizedBase64)) || '';
   if (relaySource) {
     try {

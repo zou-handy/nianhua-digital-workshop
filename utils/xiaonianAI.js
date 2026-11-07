@@ -338,6 +338,46 @@ function tryExecuteClientCommand(text) {
   return intent.reply;
 }
 
+async function callDirectAIModel(text, history, pageContext) {
+  if (!wx.cloud || !wx.cloud.extend || !wx.cloud.extend.AI || typeof wx.cloud.extend.AI.createModel !== 'function') {
+    throw new Error('当前环境不支持 createModel');
+  }
+  const sysPrompt = '你是佛山木版年画数字展馆的AI导览精灵「小年」，语气亲切灵动、博学精炼，每次回答控制在100字以内。' +
+    (pageContext ? ('\n当前展馆场景：' + pageContext) : '');
+  const recentHistory = (Array.isArray(history) ? history : []).slice(-6).map((m) => ({
+    role: m.role === 'assistant' ? 'assistant' : 'user',
+    content: String(m.content || '')
+  })).filter((m) => m.content);
+  const messages = [{ role: 'system', content: sysPrompt }, ...recentHistory];
+  if (!messages.length || messages[messages.length - 1].content !== text) {
+    messages.push({ role: 'user', content: text });
+  }
+
+  const candidates = [
+    { provider: 'cloudbase', model: 'deepseek-v4.1-flash' },
+    { provider: 'cloudbase', model: 'hy4' },
+    { provider: 'hunyuan-exp', model: 'hunyuan-turbos-latest' }
+  ];
+
+  for (const item of candidates) {
+    try {
+      const modelInstance = wx.cloud.extend.AI.createModel(item.provider);
+      if (!modelInstance || typeof modelInstance.generateText !== 'function') continue;
+      const res = await modelInstance.generateText({
+        model: item.model,
+        messages
+      });
+      const reply = (res && res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content) || res.text || '';
+      if (String(reply).trim()) {
+        return String(reply).trim();
+      }
+    } catch (e) {
+      // 继续尝试下一候选模型
+    }
+  }
+  throw new Error('端侧直连模型未返回内容');
+}
+
 async function callChatFunction(history, pageContext) {
   const response = await wx.cloud.callFunction({
     name: 'chatWithNianhua',
@@ -368,13 +408,19 @@ async function askXiaonian(options) {
     }
   } catch (agentError) {
     agentUnavailable = true;
-    console.warn('[小年] CloudBase Agent 调用失败，降级到云函数:', agentError);
+    console.info('[小年] Agent 通道切换至直连大模型/云函数:', String((agentError && agentError.message) || agentError));
+  }
+
+  try {
+    return { reply: await callDirectAIModel(text, history, pageContext), source: 'directModel' };
+  } catch (directError) {
+    // 继续降级至云函数
   }
 
   try {
     return { reply: await callChatFunction(history, pageContext), source: 'cloudFunction' };
   } catch (functionError) {
-    console.warn('[小年] 云函数调用失败，降级到本地知识库:', functionError);
+    console.info('[小年] 云函数切换至本地非遗知识库:', String((functionError && functionError.message) || functionError));
   }
 
   return { reply: generateReply(text), source: 'local' };

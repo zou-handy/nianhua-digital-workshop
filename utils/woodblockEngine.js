@@ -475,22 +475,26 @@ function selectDynamicMineralPlates(smoothed, bgMask, initialLabels, LStar, aSta
     let bestIdx = 0;
     let bestDist = Infinity;
 
-    // 强色相直通规则：保护实拍室内光下的朱砂红、鱼鳞金黄、石绿、靛青不被灰褐阴影稀释
-    if (a >= 14 && a > b * 0.48) {
-      bestIdx = (b >= 22 && L >= 52) ? 4 : 0; // 丹柿橙 vs 万年红
-    } else if (b >= 11 && L >= 58 && a > -10 && a < 18) {
+    const px = i * 4;
+    const r = smoothed[px], g = smoothed[px + 1], bRgb = smoothed[px + 2];
+
+    // 强色相直通规则：保护实拍室内光下的朱砂红、鱼鳞金黄、石绿、靛青不被灰褐阴影稀释，同时严防人物暖肤色误入红版
+    if (a >= 20 && a > b * 0.65 && (r - g) >= 62 && g < 148) {
+      bestIdx = (b >= 24 && L >= 54 && g >= 75) ? 4 : 0; // 丹柿橙 vs 万年红
+    } else if (b >= 11 && L >= 56 && a > -10 && a < 20) {
       bestIdx = 1; // 室内光下的金色/米黄鱼鳞甲与暖亮面 -> 石黄版
     } else if (a <= -5 && b >= -12) {
       bestIdx = 2; // 翠绿/青绿战袍 -> 石绿版
     } else if (b <= -5) {
       bestIdx = 3; // 靛蓝飘带/剑鞘 -> 靛青蓝版
-    } else if (chroma < 26 && L < 62) {
-      bestIdx = 5; // 暗木雕祥云/古铜色 -> 赭石棕版
+    } else if (chroma < 28 && L < 66) {
+      bestIdx = 5; // 暗木雕祥云/古铜色/肤色暗影 -> 赭石棕版
     } else {
       for (let c = 0; c < MINERAL_CANDIDATE_POOL.length; c++) {
         const [pL, pa, pb] = candidateLabs[c];
         let dist = Math.hypot((L - pL) * 0.65, a - pa, b - pb);
-        if (c === 0 && a > meanA + 5) dist -= 12; // 万年红
+        if (c === 0 && a > meanA + 8 && (r - g) >= 62 && g < 145) dist -= 12; // 万年红
+        if ((c === 0 || c === 4) && g >= 132 && bRgb >= 92 && (r - g) <= 74) dist += 42; // 抑制暖肤色落入红/橙版
         if (c === 1 && b > meanB + 4 && L >= meanL - 6) dist -= 14; // 石黄
         if (c === 2 && a < meanA - 3 && b >= -10) dist -= 12; // 石绿
         if (c === 3 && b < -4) dist -= 12; // 靛青蓝
@@ -502,10 +506,9 @@ function selectDynamicMineralPlates(smoothed, bgMask, initialLabels, LStar, aSta
       }
     }
     hitCounts[bestIdx]++;
-    const px = i * 4;
-    sumR[bestIdx] += smoothed[px];
-    sumG[bestIdx] += smoothed[px + 1];
-    sumB[bestIdx] += smoothed[px + 2];
+    sumR[bestIdx] += r;
+    sumG[bestIdx] += g;
+    sumB[bestIdx] += bRgb;
   }
 
   // 解析目标版数：支持 'auto' (3~6版自适应) 或具体数字 3..6
@@ -597,17 +600,16 @@ function ensureNoEmptyDynamicPlates(labels, activePlates, luma, LStar, aStar, bS
     const candidates = [];
     for (let i = 0; i < total; i++) {
       if (!bgMask[i] && labels[i] > 0 && labels[i] !== c && counts[labels[i]] > minRequired * 2) {
-        candidates.push(i);
+        const dLab = Math.hypot((LStar[i] - targetLab[0]) * 0.6, aStar[i] - targetLab[1], bStar[i] - targetLab[2]);
+        if (dLab <= 30) {
+          candidates.push({ idx: i, dist: dLab });
+        }
       }
     }
     if (candidates.length === 0) continue;
-    candidates.sort((i, j) => {
-      const di = Math.hypot((LStar[i] - targetLab[0]) * 0.6, aStar[i] - targetLab[1], bStar[i] - targetLab[2]);
-      const dj = Math.hypot((LStar[j] - targetLab[0]) * 0.6, aStar[j] - targetLab[1], bStar[j] - targetLab[2]);
-      return di - dj;
-    });
-    const take = Math.min(candidates.length, Math.max(minRequired, Math.round(activeTotal * 0.04)));
-    for (let k = 0; k < take; k++) labels[candidates[k]] = c;
+    candidates.sort((a, b) => a.dist - b.dist);
+    const take = Math.min(candidates.length, Math.max(minRequired, Math.round(activeTotal * 0.025)));
+    for (let k = 0; k < take; k++) labels[candidates[k].idx] = c;
   }
 
   return labels;
@@ -793,8 +795,23 @@ function separateRgbaToWoodblockPlates(rgba, width, height, options = {}) {
       continue;
     }
 
-    // 2. 宣纸高光留白保护（仅将极亮无色偏的高光/背景留白，保留浅米黄鱼鳞甲进入石黄版）
-    if ((L >= 88 && chroma < 10 && bStar[i] < 9) || (l >= 234 && chroma < 12 && bStar[i] < 10)) {
+    // 2. 宣纸底色与人物开相留白保护（将极亮高光、暖宣纸底色、以及人像面部/手部暖肉色统一归入宣纸自然开相留白）
+    const px = i * 4;
+    const r = smoothed[px], gr = smoothed[px + 1], bRgb = smoothed[px + 2];
+    const a = aStar[i], bLab = bStar[i];
+    const isPaperHighlight =
+      (L >= 88 && chroma < 10 && bLab < 9) ||
+      (l >= 234 && chroma < 12 && bLab < 10) ||
+      (L >= 87.5 && Math.abs(a) <= 7.5 && bLab >= -4 && bLab <= 29 && r >= 232 && gr >= 214 && bRgb >= 170);
+    const isPortraitSkinReserve =
+      L >= 65 && L <= 91 &&
+      a >= 6 && a <= 25.5 &&
+      bLab >= 10 && bLab <= 38 &&
+      r >= 198 && gr >= 142 && bRgb >= 104 &&
+      r > gr && gr >= bRgb &&
+      (r - gr) >= 22 && (r - gr) <= 78 &&
+      (gr - bRgb) >= 8 && (gr - bRgb) <= 60;
+    if (isPaperHighlight || isPortraitSkinReserve) {
       labels[i] = -1;
       continue;
     }
@@ -809,6 +826,8 @@ function separateRgbaToWoodblockPlates(rgba, width, height, options = {}) {
 
   for (let i = 0; i < total; i++) {
     if (labels[i] !== 99) continue;
+    const px = i * 4;
+    const r = smoothed[px], gr = smoothed[px + 1], bRgb = smoothed[px + 2];
     const L = LStar[i], a = aStar[i], b = bStar[i];
     const chroma = Math.hypot(a, b);
     let bestClass = 1;
@@ -817,11 +836,12 @@ function separateRgbaToWoodblockPlates(rgba, width, height, options = {}) {
       const key = activePlates[c].key;
       const [pL, pa, pb] = plateLabs[c];
       let dist = Math.hypot((L - pL) * 0.58, a - pa, b - pb);
-      if (key === 'red' && a >= 13 && a > b * 0.45) dist -= 18;
-      if (key === 'yellow' && b >= 10 && L >= 56 && a > -10 && a < 18) dist -= 22;
+      if (key === 'red' && a >= 20 && a > b * 0.65 && (r - gr) >= 62 && gr < 148) dist -= 18;
+      if ((key === 'red' || key === 'orange') && gr >= 132 && bRgb >= 92 && (r - gr) <= 74) dist += 44;
+      if (key === 'yellow' && b >= 10 && L >= 56 && a > -10 && a < 20) dist -= 22;
       if (key === 'green' && a <= -4 && b >= -12) dist -= 18;
       if (key === 'blue' && b <= -4) dist -= 18;
-      if (key === 'brown' && chroma < 24 && L < 64) dist -= 14;
+      if (key === 'brown' && chroma < 26 && L < 66) dist -= 14;
       if ((key === 'purple' || key === 'pink') && chroma < 28) dist += 25;
       if (dist < bestScore) {
         bestScore = dist;

@@ -486,8 +486,20 @@ function assignPhotoToWoodblockPlates(pixels, width, height, bgMask, targetPalet
     const [L, a, b] = rgbToLab(r, gr, bl);
     const chroma = Math.hypot(a, b);
 
-    // 宣纸留白判据：高明度低饱和的纸白/米白底色直接留白，不强行染黄
-    if ((L >= 86 && chroma < 19) || (l >= 224 && chroma < 24)) {
+    // 宣纸留白与人物面部开相留白判据：高明度纸白/米白底色，以及人像面部/手部暖肉色统一留白开相，严禁染成红皮肤
+    const isPaperHighlight =
+      (L >= 86 && chroma < 19) ||
+      (l >= 224 && chroma < 24) ||
+      (L >= 87.5 && Math.abs(a) <= 7.5 && b >= -4 && b <= 29 && r >= 232 && gr >= 214 && bl >= 170);
+    const isPortraitSkinReserve =
+      L >= 65 && L <= 91 &&
+      a >= 6 && a <= 25.5 &&
+      b >= 10 && b <= 38 &&
+      r >= 198 && gr >= 142 && bl >= 104 &&
+      r > gr && gr >= bl &&
+      (r - gr) >= 22 && (r - gr) <= 78 &&
+      (gr - bl) >= 8 && (gr - bl) <= 60;
+    if (isPaperHighlight || isPortraitSkinReserve) {
       assignment[i] = -1;
       continue;
     }
@@ -496,7 +508,11 @@ function assignPhotoToWoodblockPlates(pixels, width, height, bgMask, targetPalet
     let bestDist = Infinity;
     for (let p = 1; p < plateCount; p++) {
       const [pL, pa, pb] = plateLabs[p];
-      const dist = Math.hypot((L - pL) * 0.65, a - pa, b - pb);
+      let dist = Math.hypot((L - pL) * 0.65, a - pa, b - pb);
+      const pKey = targetPalette[p] && targetPalette[p].key;
+      if ((pKey === 'red' || pKey === 'orange') && gr >= 132 && bl >= 92 && (r - gr) <= 74) {
+        dist += 44;
+      }
       if (dist < bestDist) {
         bestDist = dist;
         bestPlate = p;
@@ -523,6 +539,12 @@ function assignFlatToWoodblockPlates(pixels, width, height, bgMask, targetPalett
     if (a <= 16 || isNearWhite(r, g, b)) continue;
 
     const lab = rgbToLab(r, g, b);
+    const L = lab[0], aLab = lab[1], bLab = lab[2];
+    const isPaperOrSkin =
+      (L >= 87.5 && Math.abs(aLab) <= 7.5 && bLab >= -4 && bLab <= 29 && r >= 232 && g >= 214 && b >= 170) ||
+      (L >= 65 && L <= 91 && aLab >= 6 && aLab <= 25.5 && bLab >= 10 && bLab <= 38 &&
+       r >= 198 && g >= 142 && b >= 104 && r > g && g >= b && (r - g) >= 22 && (r - g) <= 78 && (g - b) >= 8 && (g - b) <= 60);
+    if (isPaperOrSkin && targetPalette.length >= 3) continue;
     let minDist = Infinity;
     let bestLayer = -1;
 
